@@ -13,6 +13,8 @@ import { DEFAULT_SIZING, type SizingOptions } from '../ranges/sizing';
 export interface DecisionRecord {
   /** Index of the resulting action in the hand's event list. */
   eventIndex: number;
+  /** Number of actions taken before this decision. */
+  actionIndex: number;
   player: number;
   street: Street;
   legal: LegalActions;
@@ -25,37 +27,57 @@ export interface DecisionRecord {
 }
 
 export interface HandRunnerOptions {
+  /** Hero index, or -1 when every seat is a bot. */
   heroIndex: number;
   rng: Rng;
-  policy?: Policy;
+  /** Strategy of each seat. The hero's entry is ignored. Defaults to the baseline for everyone. */
+  policies?: Policy[];
+  /** Strategy everyone assumes the others play, used for public range estimates. */
+  observer?: Policy;
   sizing?: SizingOptions;
 }
 
 /**
- * Runs one hand: asks the policy for a range strategy at every decision, lets bots act
- * on it, keeps the range estimates up to date, and records the hero's decisions.
+ * Runs one hand. At every decision it asks the acting seat's policy for a range strategy,
+ * lets bots act on it, and keeps two sets of range estimates up to date:
+ *   beliefs  what the table can infer, assuming everyone plays the observer strategy
+ *   actual   what each bot's range really is, given the strategy it really plays
+ * It also records what the baseline strategy would do at each of the hero's decisions.
  */
 export class HandRunner {
   readonly hand: HandState;
   readonly heroIndex: number;
-  readonly tracker: RangeTracker;
+  readonly beliefs: RangeTracker;
+  readonly actual: RangeTracker;
   readonly decisions: DecisionRecord[] = [];
+  readonly policies: Policy[];
+  readonly observer: Policy;
   private readonly rng: Rng;
-  private readonly policy: Policy;
   private readonly sizing: SizingOptions;
   private table: StrengthTable | null = null;
   private tableSize = 0;
+  private actions = 0;
   private strategy: RangeStrategy | null = null;
+  private observerStrategy: RangeStrategy | null = null;
+  private baseline: RangeStrategy | null = null;
   private legal: LegalActions | null = null;
 
   constructor(hand: HandState, options: HandRunnerOptions) {
     this.hand = hand;
     this.heroIndex = options.heroIndex;
     this.rng = options.rng;
-    this.policy = options.policy ?? baselinePolicy;
+    const n = hand.players.length;
+    this.policies = options.policies ?? new Array<Policy>(n).fill(baselinePolicy);
+    this.observer = options.observer ?? baselinePolicy;
     this.sizing = options.sizing ?? DEFAULT_SIZING;
-    this.tracker = new RangeTracker(hand.players.length);
+    this.beliefs = new RangeTracker(n);
+    this.actual = new RangeTracker(n);
     this.prepare();
+  }
+
+  /** Alias kept for callers that only need one set of ranges. */
+  get tracker(): RangeTracker {
+    return this.beliefs;
   }
 
   get isComplete(): boolean {
@@ -66,41 +88,68 @@ export class HandRunner {
     return !this.hand.isComplete && this.hand.toAct === this.heroIndex;
   }
 
-  /** The baseline range strategy for the player to act. */
+  /** The acting seat's strategy at the current decision. */
   get currentStrategy(): RangeStrategy | null {
     return this.strategy;
+  }
+
+  /** The baseline strategy at the current decision (for the hero, what grading compares to). */
+  get baselineStrategy(): RangeStrategy | null {
+    return this.baseline;
   }
 
   get currentLegal(): LegalActions | null {
     return this.legal;
   }
 
+  get strengthTable(): StrengthTable | null {
+    return this.table;
+  }
+
+  get actionCount(): number {
+    return this.actions;
+  }
+
+  private context(legal: LegalActions) {
+    return {
+      view: toPublicView(this.hand),
+      actor: this.hand.toAct,
+      legal,
+      ranges: this.beliefs.ranges,
+      table: this.table,
+      sizing: this.sizing,
+    };
+  }
+
   private prepare(): void {
     const hand = this.hand;
     if (hand.board.length !== this.tableSize) {
       this.tableSize = hand.board.length;
-      this.tracker.removeCards(hand.board);
+      this.beliefs.removeCards(hand.board);
+      this.actual.removeCards(hand.board);
       this.table = hand.board.length >= 3 ? buildStrengthTable(hand.board) : null;
     }
     this.strategy = null;
+    this.observerStrategy = null;
+    this.baseline = null;
     this.legal = getLegalActions(hand);
     if (!this.legal) return;
-    this.strategy = this.policy.rangeStrategy({
-      view: toPublicView(hand),
-      actor: hand.toAct,
-      legal: this.legal,
-      ranges: this.tracker.ranges,
-      table: this.table,
-      sizing: this.sizing,
-    });
+    const ctx = this.context(this.legal);
+    const actor = hand.toAct;
+    const isHero = actor === this.heroIndex;
+    const policy = isHero ? baselinePolicy : this.policies[actor]!;
+    this.strategy = policy.rangeStrategy(ctx);
+    this.observerStrategy = this.observer === policy ? this.strategy : this.observer.rangeStrategy(ctx);
+    if (isHero) this.baseline = this.strategy;
   }
 
   /** Apply an action for the player to act (hero or bot). */
   act(action: Action): void {
     const hand = this.hand;
     const strategy = this.strategy;
+    const observed = this.observerStrategy;
     const legal = this.legal;
-    if (!strategy || !legal) throw new Error('No decision is pending');
+    if (!strategy || !observed || !legal) throw new Error('No decision is pending');
     const actor = hand.toAct;
     const street = hand.street;
     const eventIndex = hand.events.length;
@@ -110,6 +159,7 @@ export class HandRunner {
       const combo = comboIndex(hole[0], hole[1]);
       this.decisions.push({
         eventIndex,
+        actionIndex: this.actions,
         player: actor,
         street,
         legal,
@@ -120,11 +170,13 @@ export class HandRunner {
         chosen: action,
       });
     }
-    this.tracker.observe(actor, strategy, action);
+    this.actions++;
+    this.beliefs.observe(actor, observed, action);
+    this.actual.observe(actor, strategy, action);
     this.prepare();
   }
 
-  /** Sample the baseline action for the bot to act, using its actual hole cards. */
+  /** Sample the acting bot's action from its strategy, using its actual hole cards. */
   botAction(): Action {
     const strategy = this.strategy;
     if (!strategy) throw new Error('No decision is pending');
@@ -133,7 +185,6 @@ export class HandRunner {
     let total = 0;
     for (const p of strategy.probs) total += p[combo]!;
     if (total <= 0) {
-      // Should not happen; fall back to the passive option.
       const passive = strategy.options.find((o) => o.kind === 'passive') ?? strategy.options[0]!;
       return passive.action;
     }

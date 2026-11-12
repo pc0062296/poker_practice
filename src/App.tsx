@@ -119,6 +119,22 @@ function ToastView() {
   );
 }
 
+function NoticeView() {
+  const notice = useGame((s) => s.notice);
+  const dismiss = useGame((s) => s.dismissNotice);
+  useEffect(() => {
+    if (!notice) return;
+    const id = setTimeout(dismiss, 4000);
+    return () => clearTimeout(id);
+  }, [notice, dismiss]);
+  if (!notice) return null;
+  return (
+    <div className="toast notice" role="status" key={notice.id}>
+      {notice.text}
+    </div>
+  );
+}
+
 export function App() {
   const phase = useGame((s) => s.phase);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -130,6 +146,7 @@ export function App() {
         <section className="play">
           <TableView />
           <ToastView />
+          <NoticeView />
           {phase === 'welcome' && <Welcome onSettings={() => setSettingsOpen(true)} />}
           <ActionPanel />
         </section>

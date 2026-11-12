@@ -26,6 +26,8 @@ export interface SeatState {
   buyIn: Chips;
   /** Total chips bought so far, including the first buy-in. */
   invested: Chips;
+  /** Opaque label for the strategy this seat plays (set by the game layer). */
+  profile: string;
 }
 
 export interface Session {
@@ -39,28 +41,40 @@ export interface Session {
 const REBUY_FRACTION = 0.25;
 const SOMETIMES_STRADDLE_PROBABILITY = 0.3;
 
-/** Create a table. The hero always sits at index 0. */
-export function createSession(config: TableConfig, botNames: readonly string[], rng: Rng): Session {
+/** Pick a bot buy-in on the table's step grid. */
+export function drawBuyIn(config: TableConfig, rng: Rng): Chips {
+  const step = config.bigBlind * 10;
+  const lo = Math.min(config.botBuyInMin, config.botBuyInMax);
+  const hi = Math.max(config.botBuyInMin, config.botBuyInMax);
+  const steps = Math.floor((hi - lo) / step);
+  return lo + rng.int(steps + 1) * step;
+}
+
+/**
+ * Create a table. The hero always sits at index 0.
+ * `profiles` labels each bot seat (index 0 of the list is the first bot).
+ */
+export function createSession(
+  config: TableConfig,
+  botNames: readonly string[],
+  rng: Rng,
+  profiles: readonly string[] = [],
+  buyIns: readonly (Chips | undefined)[] = [],
+): Session {
   if (config.numPlayers < 2 || config.numPlayers > 9) {
     throw new Error(`Unsupported player count: ${config.numPlayers}`);
   }
   const seats: SeatState[] = [];
-  const step = config.bigBlind * 10;
   for (let i = 0; i < config.numPlayers; i++) {
     const isHero = i === 0;
-    let buyIn = config.heroBuyIn;
-    if (!isHero) {
-      const lo = Math.min(config.botBuyInMin, config.botBuyInMax);
-      const hi = Math.max(config.botBuyInMin, config.botBuyInMax);
-      const steps = Math.floor((hi - lo) / step);
-      buyIn = lo + rng.int(steps + 1) * step;
-    }
+    const buyIn = isHero ? config.heroBuyIn : (buyIns[i - 1] ?? drawBuyIn(config, rng));
     seats.push({
-      name: isHero ? 'Hero' : (botNames[(i - 1) % botNames.length] ?? `Bot ${i}`),
+      name: isHero ? 'Hero' : (botNames[(i - 1) % Math.max(1, botNames.length)] ?? `Bot ${i}`),
       isHero,
       stack: buyIn,
       buyIn,
       invested: buyIn,
+      profile: isHero ? 'hero' : (profiles[i - 1] ?? 'baseline'),
     });
   }
   return { config, seats, buttonIndex: rng.int(config.numPlayers), handsDealt: 0 };
@@ -103,6 +117,13 @@ export function beginHand(
     rng,
     ...overrides,
   });
+}
+
+/** A new player takes over a bot seat between hands. */
+export function replaceSeat(session: Session, index: number, name: string, profile: string, buyIn: Chips): void {
+  const seat = session.seats[index];
+  if (!seat || seat.isHero) throw new Error(`Cannot replace seat ${index}`);
+  session.seats[index] = { name, isHero: false, stack: buyIn, buyIn, invested: buyIn, profile };
 }
 
 /** Copy final stacks from a finished hand back to the table. */

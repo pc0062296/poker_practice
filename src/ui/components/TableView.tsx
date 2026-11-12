@@ -43,6 +43,7 @@ export function TableView() {
   const phase = useGame((s) => s.phase);
   const revealCount = useGame((s) => s.revealCount);
   const settings = useGame((s) => s.settings);
+  const seatInfo = useGame((s) => s.seats);
 
   const areaRef = useRef<HTMLDivElement>(null);
   const area = useElementSize(areaRef);
@@ -146,7 +147,12 @@ export function TableView() {
               </div>
               <div className="seat-plate">
                 <span className="seat-pos">{p.position}</span>
-                <span className="seat-name">{p.name}</span>
+                <span className="seat-name">
+                  {p.name}
+                  {settings.showTypes && !isHero && seatInfo[i] && (
+                    <em className={`seat-type type-${seatInfo[i]!.profile}`}>{messages.profile[seatInfo[i]!.profile]}</em>
+                  )}
+                </span>
                 <span className="seat-stack">
                   {p.allIn && !over ? messages.action.allIn : formatAmount(p.stack - pendingWin, settings)}
                 </span>

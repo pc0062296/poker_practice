@@ -2,7 +2,8 @@ import { potTotal } from '../engine/hand';
 import { postflopOrder } from '../engine/positions';
 import type { Chips, PublicView } from '../engine/types';
 import { NUM_COMBOS } from '../eval/combos';
-import { beatFractions, drawStrengths } from '../eval/strengthTable';
+import { beatFractions } from '../eval/strengthTable';
+import { boardFeatures } from './features';
 import { roundToChip } from '../ranges/sizing';
 import type { DecisionContext, DecisionOption, RangeStrategy } from './types';
 
@@ -45,6 +46,13 @@ const DEFEND_BAND = 0.15;
 /** A bet or raise that uses at least this share of the stack becomes an all-in. */
 const SHOVE_FRACTION = 0.65;
 
+/** Scratch buffers reused between calls (strategies are computed one at a time). */
+const V = new Float32Array(NUM_COMBOS);
+const TMP = new Float32Array(NUM_COMBOS);
+const PCT = new Float32Array(NUM_COMBOS);
+const P_BET = new Float32Array(NUM_COMBOS);
+const BIG_SHARE = new Float32Array(NUM_COMBOS);
+
 function streetIndex(view: PublicView): number {
   return view.street === 'flop' ? 0 : view.street === 'turn' ? 1 : 2;
 }
@@ -63,14 +71,13 @@ export function postflopStrategy(ctx: DecisionContext): RangeStrategy {
   const multiway = MULTIWAY[Math.min(nOpp, 3) - 1]!;
 
   // v: chance to be ahead of everyone right now.
-  const v = new Float32Array(NUM_COMBOS).fill(1);
-  const tmp = new Float32Array(NUM_COMBOS);
+  const v = V.fill(1);
   for (const o of opponents) {
-    beatFractions(table, ranges[o.index]!, tmp);
-    for (let i = 0; i < NUM_COMBOS; i++) v[i]! *= tmp[i]!;
+    beatFractions(table, ranges[o.index]!, TMP);
+    for (let i = 0; i < NUM_COMBOS; i++) v[i]! *= TMP[i]!;
   }
-  const pct = beatFractions(table, own);
-  const d = drawStrengths(view.board);
+  const pct = beatFractions(table, own, PCT);
+  const d = boardFeatures(table).draw;
   const playable = table.order;
 
   const sizeTo = (desired: number): Chips => {
@@ -114,8 +121,8 @@ export function postflopStrategy(ctx: DecisionContext): RangeStrategy {
     const bluffLead = isAggressor ? 1 : noInitiative ? 0.8 : inPosition ? 0.7 : 0.3;
 
     const valueLine = VALUE_BET[si]! + 0.02 * (nOpp - 1);
-    const pBet = new Float32Array(NUM_COMBOS);
-    const bigShare = new Float32Array(NUM_COMBOS);
+    const pBet = P_BET.fill(0);
+    const bigShare = BIG_SHARE.fill(0);
     let valueMass = 0;
     let semiMass = 0;
     let airMass = 0;

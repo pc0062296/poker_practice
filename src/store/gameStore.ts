@@ -4,10 +4,20 @@ import { cryptoRng } from '../engine/rng';
 import { beginHand, createSession, endHand, seatNet, type Session } from '../engine/session';
 import type { Action, HandState, LegalActions } from '../engine/types';
 import { HandRunner } from '../game/handRunner';
+import { assignProfiles, drawBotBuyIn, maybeChangeSeat, observerPolicy, seatPolicies } from '../game/lineup';
+import { countHand, emptyCounts, type StatCounts } from '../game/stats';
 import { gradePreflopDecision, type PreflopGrade, type PreflopVerdict } from '../grading/preflop';
-import { messages } from '../i18n';
+import { fmt, messages } from '../i18n';
 import { countHands, saveHand } from '../storage/handStore';
-import { loadSettings, needsRestart, saveSettings, toTableConfig, type Settings } from './settings';
+import {
+  loadSettings,
+  needsRestart,
+  saveSettings,
+  SEAT_CHANGE_RATE,
+  toLineup,
+  toTableConfig,
+  type Settings,
+} from './settings';
 
 /** The hero always sits at index 0. */
 export const HERO = 0;
@@ -32,6 +42,16 @@ export interface SessionStats {
   good: number;
 }
 
+export interface SeatInfo {
+  name: string;
+  profile: string;
+}
+
+export interface Notice {
+  id: number;
+  text: string;
+}
+
 export interface Toast {
   id: number;
   heroNet: number;
@@ -53,11 +73,18 @@ export interface GameState {
   toast: Toast | null;
   /** Hands saved on this device, or null when storage is unavailable. */
   storedHands: number | null;
+  /** Who sits in each seat and what type of player they are. */
+  seats: SeatInfo[];
+  /** Statistics observed for each seat since the player sat down. */
+  seatCounts: StatCounts[];
+  /** Table news, such as a player leaving. */
+  notice: Notice | null;
   start(): void;
   heroAct(action: Action): void;
   nextHand(): void;
   applySettings(next: Settings): void;
   dismissToast(): void;
+  dismissNotice(): void;
 }
 
 const EMPTY_STATS: SessionStats = { hands: 0, net: 0, graded: 0, good: 0 };
@@ -72,6 +99,7 @@ let session: Session | null = null;
 let runner: HandRunner | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let toastId = 0;
+let noticeId = 0;
 
 function clearTimer(): void {
   if (timer !== null) {
@@ -86,15 +114,32 @@ export const useGame = create<GameState>((set, get) => {
     set({ hand: cloneHand(runner.hand), legal: runner.heroToAct ? runner.currentLegal : null });
   };
 
+  const seatInfo = (s: Session): SeatInfo[] => s.seats.map((seat) => ({ name: seat.name, profile: seat.profile }));
+
   const deal = (): void => {
     if (!session) return;
+    const { settings } = get();
+    const lineup = toLineup(settings);
+    if (session.handsDealt > 0) {
+      const change = maybeChangeSeat(session, lineup, SEAT_CHANGE_RATE[settings.seatChanges], messages.botNames, rng);
+      if (change) {
+        const seatCounts = get().seatCounts.slice();
+        seatCounts[change.seat] = emptyCounts();
+        set({
+          seatCounts,
+          notice: { id: ++noticeId, text: fmt(messages.notice.seatChange, { leaving: change.leaving, joining: change.joining }) },
+        });
+      }
+    }
     const hand = beginHand(session, rng);
     runner = new HandRunner(hand, {
       heroIndex: HERO,
       rng,
-      sizing: { openSize: get().settings.openSizeBB },
+      policies: seatPolicies(session, lineup),
+      observer: observerPolicy(session, lineup),
+      sizing: { openSize: settings.openSizeBB },
     });
-    set({ phase: 'playing', revealCount: 0 });
+    set({ phase: 'playing', revealCount: 0, seats: seatInfo(session) });
     publish();
     pump();
   };
@@ -114,6 +159,9 @@ export const useGame = create<GameState>((set, get) => {
     const entry: HistoryEntry = { id: hand.handId, time, hand: cloneHand(hand), grades, heroNet };
 
     const state = get();
+    const seatCounts = state.seatCounts.map((c) => ({ ...c }));
+    while (seatCounts.length < hand.players.length) seatCounts.push(emptyCounts());
+    countHand(hand, seatCounts);
     const counted = grades.filter((g) => g.verdict !== 'ungraded');
     const stats: SessionStats = {
       hands: state.stats.hands + 1,
@@ -139,11 +187,11 @@ export const useGame = create<GameState>((set, get) => {
       for (const g of counted) {
         if (worst === null || VERDICT_RANK[g.verdict] > VERDICT_RANK[worst]) worst = g.verdict;
       }
-      set({ lastHand: entry, history, stats, toast: { id: ++toastId, heroNet, verdict: worst } });
+      set({ lastHand: entry, history, stats, seatCounts, toast: { id: ++toastId, heroNet, verdict: worst } });
       deal();
       return;
     }
-    set({ phase: 'handOver', lastHand: entry, history, stats, legal: null });
+    set({ phase: 'handOver', lastHand: entry, history, stats, seatCounts, legal: null });
     const wait = state.settings.autoNextSeconds;
     if (wait > 0) timer = setTimeout(() => get().nextHand(), wait * 1000);
   };
@@ -191,11 +239,36 @@ export const useGame = create<GameState>((set, get) => {
 
   const openTable = (): void => {
     clearTimer();
-    session = createSession(toTableConfig(get().settings), messages.botNames, rng);
+    const { settings } = get();
+    const config = toTableConfig(settings);
+    const lineup = toLineup(settings);
+    const bots = config.numPlayers - 1;
+    const names = shuffleNames(messages.botNames).slice(0, bots);
+    const profiles = assignProfiles(lineup, bots, rng);
+    const buyIns = profiles.map(() => drawBotBuyIn(config, lineup, rng));
+    session = createSession(config, names, rng, profiles, buyIns);
     session.seats[HERO]!.name = messages.heroName;
     runner = null;
-    set({ stats: EMPTY_STATS, lastHand: null, toast: null, hand: null, legal: null });
+    set({
+      stats: EMPTY_STATS,
+      lastHand: null,
+      toast: null,
+      notice: null,
+      hand: null,
+      legal: null,
+      seats: seatInfo(session),
+      seatCounts: session.seats.map(() => emptyCounts()),
+    });
     deal();
+  };
+
+  const shuffleNames = (names: readonly string[]): string[] => {
+    const out = names.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = rng.int(i + 1);
+      [out[i], out[j]] = [out[j]!, out[i]!];
+    }
+    return out;
   };
 
   void countHands().then((n) => set({ storedHands: n }));
@@ -211,6 +284,9 @@ export const useGame = create<GameState>((set, get) => {
     stats: EMPTY_STATS,
     toast: null,
     storedHands: null,
+    seats: [],
+    seatCounts: [],
+    notice: null,
 
     start: () => openTable(),
 
@@ -235,5 +311,6 @@ export const useGame = create<GameState>((set, get) => {
     },
 
     dismissToast: () => set({ toast: null }),
+    dismissNotice: () => set({ notice: null }),
   };
 });

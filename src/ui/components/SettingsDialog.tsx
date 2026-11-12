@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { SEAT_PROFILE_IDS, type CustomProfileSettings, type ProfileId } from '../../bots/profiles';
 import { fmt, messages } from '../../i18n';
 import { useGame } from '../../store/gameStore';
 import { needsRestart, sanitizeSettings, type Settings } from '../../store/settings';
@@ -50,6 +51,37 @@ function NumberField({ value, onChange, min, max, step = 1, suffix }: { value: n
       />
       {suffix && <span className="number-suffix">{suffix}</span>}
     </span>
+  );
+}
+
+function SliderField({ label, value, min, max, step = 1, onChange }: { label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void }) {
+  return (
+    <label className="slider-field">
+      <span>{label}</span>
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <output>{value}</output>
+    </label>
+  );
+}
+
+function CustomProfileEditor({ value, onChange }: { value: CustomProfileSettings; onChange: (v: CustomProfileSettings) => void }) {
+  const t = messages.settings;
+  const set = (p: Partial<CustomProfileSettings>) => {
+    const next = { ...value, ...p };
+    next.pfr = Math.min(next.pfr, next.vpip);
+    onChange(next);
+  };
+  return (
+    <div className="field-wide">
+      <h4 className="settings-section">{t.customProfile}</h4>
+      <SliderField label={t.customVpip} value={value.vpip} min={5} max={60} onChange={(vpip) => set({ vpip })} />
+      <SliderField label={t.customPfr} value={value.pfr} min={0} max={value.vpip} onChange={(pfr) => set({ pfr })} />
+      <SliderField label={t.customThreeBet} value={value.threeBet} min={0} max={30} onChange={(threeBet) => set({ threeBet })} />
+      <SliderField label={t.customAggression} value={value.aggression} min={0} max={100} step={5} onChange={(aggression) => set({ aggression })} />
+      <SliderField label={t.customBluff} value={value.bluff} min={0} max={100} step={5} onChange={(bluff) => set({ bluff })} />
+      <SliderField label={t.customSticky} value={value.sticky} min={0} max={100} step={5} onChange={(sticky) => set({ sticky })} />
+      <SliderField label={t.customOpenSize} value={value.openSize} min={2} max={8} step={0.5} onChange={(openSize) => set({ openSize })} />
+    </div>
   );
 }
 
@@ -143,6 +175,68 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           options={[2.5, 3, 4, 5].map((n) => ({ value: n, label: `${n} ${t.bb}` }))}
           onChange={(openSizeBB) => patch({ openSizeBB })}
         />
+      </Row>
+
+      <h3 className="settings-section">{t.opponentsSection}</h3>
+      <Row label={t.tablePreset}>
+        <Choice
+          value={draft.tablePreset}
+          options={[
+            { value: 'macau', label: t.presetMacau },
+            { value: 'taiwan', label: t.presetTaiwan },
+            { value: 'baseline', label: t.presetBaseline },
+            { value: 'custom', label: t.presetCustom },
+          ]}
+          onChange={(tablePreset) => patch({ tablePreset })}
+        />
+      </Row>
+      <p className="settings-note">{t.presetNote}</p>
+      {draft.tablePreset === 'custom' && (
+        <div className="seat-grid">
+          {draft.seatProfiles.slice(0, draft.numPlayers - 1).map((id, i) => (
+            <label key={i}>
+              {fmt(t.seat, { n: i + 1 })}
+              <select
+                value={id}
+                onChange={(e) => {
+                  const seatProfiles = draft.seatProfiles.slice();
+                  seatProfiles[i] = e.target.value as ProfileId;
+                  patch({ seatProfiles });
+                }}
+              >
+                {SEAT_PROFILE_IDS.map((p) => (
+                  <option key={p} value={p}>
+                    {messages.profile[p]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </div>
+      )}
+      {draft.tablePreset === 'custom' && draft.seatProfiles.slice(0, draft.numPlayers - 1).includes('custom') && (
+        <CustomProfileEditor value={draft.customProfile} onChange={(customProfile) => patch({ customProfile })} />
+      )}
+      <Row label={t.seatChanges}>
+        <Choice
+          value={draft.seatChanges}
+          options={[
+            { value: 'off', label: t.seatChangesOff },
+            { value: 'sometimes', label: t.seatChangesSometimes },
+            { value: 'often', label: t.seatChangesOften },
+          ]}
+          onChange={(seatChanges) => patch({ seatChanges })}
+        />
+      </Row>
+      <Row label="">
+        <label className="check">
+          <input type="checkbox" checked={draft.showTypes} onChange={(e) => patch({ showTypes: e.target.checked })} />
+          {t.showTypes}
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={draft.shortStacks} onChange={(e) => patch({ shortStacks: e.target.checked })} />
+          {t.shortStacks}
+        </label>
       </Row>
 
       <h3 className="settings-section">{t.displaySection}</h3>

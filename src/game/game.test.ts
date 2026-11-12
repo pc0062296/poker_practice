@@ -13,29 +13,31 @@ describe('hand runner', () => {
   it('plays complete hands with legal actions only', () => {
     // applyAction throws on any illegal action, so finishing is the assertion.
     const stats = selfPlay(1500, 2024);
-    expect(stats.hands).toBe(1500);
+    expect(stats.hands).toBe(1500 * 9);
   });
 
   it('produces plausible table statistics for nine baseline players', () => {
     const stats = selfPlay(4000, 77);
     if (process.env.STATS_OUT) writeFileSync(process.env.STATS_OUT, JSON.stringify(stats, null, 2));
-    expect(stats.vpip).toBeGreaterThan(0.12);
-    expect(stats.vpip).toBeLessThan(0.3);
-    expect(stats.pfr).toBeGreaterThan(0.09);
-    expect(stats.pfr).toBeLessThan(stats.vpip);
-    expect(stats.threeBet).toBeGreaterThan(0.03);
-    expect(stats.threeBet).toBeLessThan(0.12);
-    expect(stats.cbet).toBeGreaterThan(0.4);
-    expect(stats.cbet).toBeLessThan(0.85);
-    expect(stats.foldToCbet).toBeGreaterThan(0.25);
-    expect(stats.foldToCbet).toBeLessThan(0.65);
+    expect(stats.vpip!).toBeGreaterThan(0.12);
+    expect(stats.vpip!).toBeLessThan(0.3);
+    expect(stats.pfr!).toBeGreaterThan(0.09);
+    expect(stats.pfr!).toBeLessThan(stats.vpip!);
+    expect(stats.threeBet!).toBeGreaterThan(0.03);
+    expect(stats.threeBet!).toBeLessThan(0.12);
+    expect(stats.cbet!).toBeGreaterThan(0.4);
+    expect(stats.cbet!).toBeLessThan(0.85);
+    expect(stats.foldToCbet!).toBeGreaterThan(0.25);
+    expect(stats.foldToCbet!).toBeLessThan(0.65);
   });
 
   it('works with a straddle, short tables and heads-up', () => {
-    selfPlay(300, 5, { ...DEFAULT_TABLE, straddle: 'always' });
-    selfPlay(300, 6, { ...DEFAULT_TABLE, numPlayers: 6 });
-    selfPlay(300, 7, { ...DEFAULT_TABLE, numPlayers: 2 });
-    selfPlay(300, 8, { ...DEFAULT_TABLE, numPlayers: 3, heroBuyIn: 3000, botBuyInMin: 1500, botBuyInMax: 4000, topUp: 'bust' });
+    selfPlay(300, 5, { config: { ...DEFAULT_TABLE, straddle: 'always' } });
+    selfPlay(300, 6, { config: { ...DEFAULT_TABLE, numPlayers: 6 } });
+    selfPlay(300, 7, { config: { ...DEFAULT_TABLE, numPlayers: 2 } });
+    selfPlay(300, 8, {
+      config: { ...DEFAULT_TABLE, numPlayers: 3, heroBuyIn: 3000, botBuyInMin: 1500, botBuyInMax: 4000, topUp: 'bust' },
+    });
   });
 
   it('narrows the range of a player who opens under the gun', () => {

@@ -24,7 +24,11 @@ export const zhTW = {
     straight: '{name} {a} 高',
   },
 
-  botNames: ['阿明', '小陳', '老王', '阿傑', '小林', '大偉', '阿凱', '志豪', '建宏', '家豪'],
+  botNames: [
+    '阿明', '小陳', '老王', '阿傑', '小林', '大偉', '阿凱', '志豪', '建宏', '家豪',
+    '俊宏', '冠廷', '宗翰', '承恩', '阿德', '老李', '阿輝', '小黃', '阿龍', '文雄',
+    '美玲', '雅婷', '阿華', '大頭', '阿財', '小胖',
+  ],
   heroName: '你',
 
   action: {
@@ -88,7 +92,52 @@ export const zhTW = {
     empty: '還沒有任何動作',
   },
 
-  tabs: { feedback: '回饋', log: '紀錄', history: '歷史' },
+  tabs: { feedback: '回饋', log: '紀錄', history: '歷史', opponents: '對手' },
+
+  notice: {
+    seatChange: '{leaving} 離桌，{joining} 入座',
+  },
+
+  profile: {
+    baseline: '基準',
+    tag: '緊凶常客',
+    lag: '鬆凶',
+    nit: '緊弱',
+    station: '跟注站',
+    limper: '平跟型',
+    maniac: '瘋子',
+    population: '一般玩家',
+    custom: '自訂',
+    hero: '你',
+  } as Record<string, string>,
+
+  profileDescription: {
+    baseline: '依範圍表與規則打牌，接近平衡的打法',
+    tag: '入池少，多半加注進池，翻後有牌就下注',
+    lag: '入池多、常 3bet，翻後給很多壓力',
+    nit: '只玩好牌，下注和加注多半是真的',
+    station: '什麼都跟，很少詐唬，很難被打走',
+    limper: '大量平跟入池，翻後被動，有牌才打',
+    maniac: '加注、再加注、常常大注，詐唬很多',
+    population: '線下現金桌的平均樣子，略鬆略被動',
+    custom: '用下方的數值自己設定',
+  } as Record<string, string>,
+
+  opponents: {
+    title: '這一桌的對手',
+    note: '線下沒有 HUD。這些是你在這桌觀察到的數字，手數少時參考價值低。',
+    hidden: '已隱藏',
+    hands: '手數',
+    vpip: '入池',
+    pfr: '加注',
+    limp: '平跟',
+    threeBet: '3bet',
+    cbet: '持續下注',
+    foldToCbet: '棄牌給持續下注',
+    wtsd: '攤牌',
+    aggression: '翻後激進度',
+    you: '你',
+  },
 
   stats: {
     hands: '手數',
@@ -196,6 +245,28 @@ export const zhTW = {
     cancel: '取消',
     restart: '重新開桌',
     bb: 'BB',
+    opponentsSection: '對手',
+    tablePreset: '牌桌類型',
+    presetMacau: '澳門常見桌',
+    presetTaiwan: '台灣常見桌',
+    presetBaseline: '全基準桌',
+    presetCustom: '逐座自訂',
+    presetNote: '牌桌類型是依我對常見線下玩家的假設組合而成，不是實際統計資料，可以改成逐座自訂。',
+    seat: '座位 {n}',
+    customProfile: '自訂玩家',
+    customVpip: '入池率 %',
+    customPfr: '翻前加注率 %',
+    customThreeBet: '3bet %',
+    customAggression: '翻後積極度',
+    customBluff: '詐唬',
+    customSticky: '跟注黏性',
+    customOpenSize: '開池尺寸 BB',
+    showTypes: '顯示對手類型',
+    shortStacks: '有些對手短碼入座',
+    seatChanges: '換桌友',
+    seatChangesOff: '不換',
+    seatChangesSometimes: '偶爾',
+    seatChangesOften: '經常',
   },
 
   welcome: {

@@ -5,8 +5,9 @@ import { useGame, type HistoryEntry } from '../../store/gameStore';
 import type { Settings } from '../../store/settings';
 import { describeEvent } from '../format';
 import { FeedbackPanel, GradeCard, HandSummary } from './Feedback';
+import { OpponentsPanel } from './OpponentsPanel';
 
-type Tab = 'feedback' | 'log' | 'history';
+type Tab = 'feedback' | 'log' | 'history' | 'opponents';
 
 /** Hand history lines. While a hand is in progress, nothing beyond what is on screen is shown. */
 interface LogLine {
@@ -95,7 +96,7 @@ function HistoryPanel() {
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('feedback');
-  const tabs: Tab[] = ['feedback', 'log', 'history'];
+  const tabs: Tab[] = ['feedback', 'log', 'history', 'opponents'];
   return (
     <>
       {open && <div className="sidebar-scrim" onClick={onClose} />}
@@ -114,6 +115,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           {tab === 'feedback' && <FeedbackPanel />}
           {tab === 'log' && <LogPanel />}
           {tab === 'history' && <HistoryPanel />}
+          {tab === 'opponents' && <OpponentsPanel />}
         </div>
       </aside>
     </>
