@@ -1318,9 +1318,8 @@ input:focus-visible {
 
 .toast {
   position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 8px;
+  left: 10px;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -1343,7 +1342,7 @@ input:focus-visible {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -8px);
+    transform: translateY(-8px);
   }
 }
 

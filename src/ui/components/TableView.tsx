@@ -174,7 +174,9 @@ export function TableView() {
         {hand && (
           <div
             className="dealer-button"
-            style={pos(buttonSpot(layout.seats[hand.buttonIndex]!, layout.center, layout.portrait))}
+            style={pos(
+              buttonSpot(layout.seats[hand.buttonIndex]!, layout.center, layout.portrait, hand.buttonIndex === HERO),
+            )}
           >
             {messages.table.dealer}
           </div>
@@ -191,7 +193,9 @@ function betPull(portrait: boolean, hero: boolean): number {
 }
 
 /** The dealer button sits beside the seat, slightly towards the center. */
-function buttonSpot(seat: Point, center: Point, portrait: boolean): Point {
+function buttonSpot(seat: Point, center: Point, portrait: boolean, hero: boolean): Point {
+  // The hero's cards are large, so the button goes to their right instead of on top of them.
+  if (hero) return { x: seat.x + (portrait ? 19 : 9.5), y: seat.y - 2 };
   const towards = lerp(seat, center, portrait ? 0.24 : 0.22);
   const dx = center.x - seat.x;
   const dy = center.y - seat.y;
