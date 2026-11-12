@@ -1,7 +1,11 @@
 import { create } from 'zustand';
-import { cloneHand, toHandRecord } from '../engine/hand';
+import { cloneHand, potTotal, toHandRecord } from '../engine/hand';
+import { assignPositions } from '../engine/positions';
+import { comboIndex } from '../eval/combos';
+import { runSpot, spotById, spotFits } from '../game/spots';
+import { buttonFor } from '../review/model';
 import { cryptoRng } from '../engine/rng';
-import { beginHand, createSession, endHand, seatNet, type Session } from '../engine/session';
+import { beginHand, createSession, endHand, placeButton, seatNet, type Session } from '../engine/session';
 import type { Action, HandState, LegalActions } from '../engine/types';
 import { HandRunner } from '../game/handRunner';
 import { assignProfiles, drawBotBuyIn, maybeChangeSeat, observerPolicy, seatPolicies } from '../game/lineup';
@@ -19,6 +23,7 @@ import {
   SEAT_CHANGE_RATE,
   toLineup,
   toTableConfig,
+  UNITS_PER_BB,
   type Settings,
 } from './settings';
 
@@ -60,6 +65,10 @@ export interface SessionStats {
   postflopGood: number;
   /** Total EV given up on postflop decisions, in chips. */
   evLoss: number;
+  /** Hands folded automatically because folding was the only reasonable play. */
+  skipped: number;
+  potQuizRight: number;
+  potQuizTotal: number;
 }
 
 export interface SeatInfo {
@@ -105,9 +114,34 @@ export interface GameState {
   applySettings(next: Settings): void;
   dismissToast(): void;
   dismissNotice(): void;
+  /** Live mode: a pending or answered pot-size question at the hero's decision. */
+  potQuiz: PotQuiz | null;
+  answerPotQuiz(guess: number): void;
 }
 
-const EMPTY_STATS: SessionStats = { hands: 0, net: 0, graded: 0, good: 0, postflopGraded: 0, postflopGood: 0, evLoss: 0 };
+export interface PotQuiz {
+  answer: number;
+  guess: number | null;
+  correct: boolean | null;
+}
+
+const EMPTY_STATS: SessionStats = {
+  hands: 0,
+  net: 0,
+  graded: 0,
+  good: 0,
+  postflopGraded: 0,
+  postflopGood: 0,
+  evLoss: 0,
+  skipped: 0,
+  potQuizRight: 0,
+  potQuizTotal: 0,
+};
+
+/** Share of postflop decisions where the hero is asked to name the pot first (live mode). */
+const POT_QUIZ_RATE = 0.4;
+/** A pot estimate counts as right within this share of the pot (or one big blind). */
+const POT_QUIZ_TOLERANCE = 0.1;
 const HISTORY_LIMIT = 100;
 const BOT_DELAY_MS = { fast: 220, normal: 600, slow: 1000 } as const;
 const REVEAL_DELAY_MS = { fast: 300, normal: 500, slow: 700 } as const;
@@ -119,6 +153,10 @@ let session: Session | null = null;
 let runner: HandRunner | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let toastId = 0;
+/** Set when the hero's hand was folded automatically. */
+let autoSkipped = false;
+/** Decision for which the pot question was already considered. */
+let quizKey = '';
 let entryKey = 0;
 let noticeId = 0;
 
@@ -160,15 +198,31 @@ export const useGame = create<GameState>((set, get) => {
         });
       }
     }
-    const hand = beginHand(session, rng);
-    runner = new HandRunner(hand, {
-      heroIndex: HERO,
-      rng,
-      policies: seatPolicies(session, lineup),
-      observer: observerPolicy(session, lineup),
-      sizing: { openSize: settings.openSizeBB },
-    });
-    set({ phase: 'playing', revealCount: 0, seats: seatInfo(session) });
+    const n = session.seats.length;
+    const positions = assignPositions(n, 0);
+    const spot = settings.practiceSpot !== 'off' ? spotById(settings.practiceSpot) : undefined;
+    const useSpot = spot && spotFits(spot, positions) ? spot : undefined;
+    const locked = settings.lockPosition !== 'off' && positions.includes(settings.lockPosition) ? settings.lockPosition : null;
+    if (useSpot) placeButton(session, buttonFor(n, useSpot.hero));
+    else if (locked) placeButton(session, buttonFor(n, locked));
+    const makeRunner = () =>
+      new HandRunner(beginHand(session!, rng), {
+        heroIndex: HERO,
+        rng,
+        policies: seatPolicies(session!, lineup),
+        observer: observerPolicy(session!, lineup),
+        sizing: { openSize: settings.openSizeBB },
+      });
+    runner = makeRunner();
+    if (useSpot && !runSpot(runner, useSpot, HERO, rng)) {
+      // A stack too short for the script: deal an ordinary hand instead.
+      session.handsDealt--;
+      placeButton(session, buttonFor(n, useSpot.hero));
+      runner = makeRunner();
+    }
+    autoSkipped = false;
+    quizKey = '';
+    set({ phase: 'playing', revealCount: 0, seats: seatInfo(session), potQuiz: null });
     publish();
     pump();
   };
@@ -179,9 +233,11 @@ export const useGame = create<GameState>((set, get) => {
     endHand(session, hand);
     const hole = hand.players[HERO]!.hole;
     const grades: PreflopGrade[] = [];
-    for (const decision of runner.decisions) {
-      const grade = gradePreflopDecision(decision, hole);
-      if (grade) grades.push(grade);
+    if (!autoSkipped) {
+      for (const decision of runner.decisions) {
+        const grade = gradePreflopDecision(decision, hole);
+        if (grade) grades.push(grade);
+      }
     }
     const heroNet = hand.result!.net[HERO]!;
     const time = Date.now();
@@ -207,6 +263,7 @@ export const useGame = create<GameState>((set, get) => {
     const stats: SessionStats = {
       ...state.stats,
       hands: state.stats.hands + 1,
+      skipped: state.stats.skipped + (autoSkipped ? 1 : 0),
       net: seatNet(session.seats[HERO]!),
       graded: state.stats.graded + counted.length,
       good: state.stats.good + counted.filter((g) => g.verdict === 'best' || g.verdict === 'ok').length,
@@ -254,7 +311,7 @@ export const useGame = create<GameState>((set, get) => {
         .catch(() => updateEntry(entry.key, { postflop: [], gradingFailed: true }));
     }
 
-    const skipped = hand.players[HERO]!.folded && state.settings.skipAfterFold;
+    const skipped = hand.players[HERO]!.folded && (state.settings.skipAfterFold || autoSkipped);
     if (skipped) {
       let worst: PreflopVerdict | null = null;
       for (const g of counted) {
@@ -277,7 +334,7 @@ export const useGame = create<GameState>((set, get) => {
     const hand = runner.hand;
     const hero = hand.players[HERO]!;
 
-    if (hero.folded && settings.skipAfterFold) {
+    if (hero.folded && (settings.skipAfterFold || autoSkipped)) {
       runner.runBots();
       set({ revealCount: hand.board.length });
       publish();
@@ -296,7 +353,26 @@ export const useGame = create<GameState>((set, get) => {
       finishHand();
       return;
     }
-    if (runner.heroToAct) return;
+    if (runner.heroToAct) {
+      const strategy = runner.baselineStrategy;
+      // Auto-skip: the hero's first decision, and the baseline folds this hand every time.
+      if (settings.skipTrivialFolds && hand.street === 'preflop' && runner.decisions.length === 0 && strategy) {
+        const fold = strategy.options.findIndex((o) => o.kind === 'fold');
+        const combo = comboIndex(hero.hole[0], hero.hole[1]);
+        if (fold >= 0 && strategy.probs[fold]![combo]! >= 0.999) {
+          autoSkipped = true;
+          runner.act({ type: 'fold' });
+          pump();
+          return;
+        }
+      }
+      const key = `${hand.handId}:${hand.events.length}`;
+      if (settings.potQuiz && hand.street !== 'preflop' && quizKey !== key) {
+        quizKey = key;
+        if (rng.next() < POT_QUIZ_RATE) set({ potQuiz: { answer: potTotal(hand), guess: null, correct: null } });
+      }
+      return;
+    }
 
     const action = runner.botAction();
     const jitter = 0.7 + 0.6 * Math.random();
@@ -365,6 +441,9 @@ export const useGame = create<GameState>((set, get) => {
 
     heroAct: (action) => {
       if (!runner || !runner.heroToAct) return;
+      const quiz = get().potQuiz;
+      if (quiz && quiz.guess === null) return;
+      if (quiz) set({ potQuiz: null });
       runner.act(action);
       publish();
       pump();
@@ -385,5 +464,16 @@ export const useGame = create<GameState>((set, get) => {
 
     dismissToast: () => set({ toast: null }),
     dismissNotice: () => set({ notice: null }),
+
+    potQuiz: null,
+    answerPotQuiz: (guess) => {
+      const quiz = get().potQuiz;
+      if (!quiz || quiz.guess !== null) return;
+      const correct = Math.abs(guess - quiz.answer) <= Math.max(UNITS_PER_BB, quiz.answer * POT_QUIZ_TOLERANCE);
+      set((s) => ({
+        potQuiz: { ...quiz, guess, correct },
+        stats: { ...s.stats, potQuizRight: s.stats.potQuizRight + (correct ? 1 : 0), potQuizTotal: s.stats.potQuizTotal + 1 },
+      }));
+    },
   };
 });

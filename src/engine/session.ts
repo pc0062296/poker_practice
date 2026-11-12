@@ -119,6 +119,12 @@ export function beginHand(
   });
 }
 
+/** Make the next hand dealt by `beginHand` have the button at `target`. */
+export function placeButton(session: Session, target: number): void {
+  const n = session.seats.length;
+  session.buttonIndex = session.handsDealt > 0 ? (target - 1 + n) % n : target;
+}
+
 /** A new player takes over a bot seat between hands. */
 export function replaceSeat(session: Session, index: number, name: string, profile: string, buyIn: Chips): void {
   const seat = session.seats[index];

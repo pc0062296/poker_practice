@@ -6,6 +6,10 @@ import {
   type TablePresetId,
 } from '../bots/profiles';
 import type { StraddleMode, TableConfig, TopUpMode } from '../engine/session';
+import type { PositionName } from '../engine/types';
+import { SPOTS } from '../game/spots';
+
+const POSITION_NAMES: PositionName[] = ['UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
 import type { LineupOptions } from '../game/lineup';
 
 export const UNITS_PER_BB = 100;
@@ -36,6 +40,14 @@ export interface Settings {
   // Applied without restarting the table.
   showTypes: boolean;
   seatChanges: SeatChangeRate;
+  /** Practice spot id, or 'off' for ordinary hands. */
+  practiceSpot: string;
+  lockPosition: PositionName | 'off';
+  skipTrivialFolds: boolean;
+  // Live mode.
+  hidePot: boolean;
+  potQuiz: boolean;
+  manualBet: boolean;
   // Display and pace: applied immediately.
   botSpeed: BotSpeed;
   fourColor: boolean;
@@ -62,6 +74,12 @@ export const DEFAULT_SETTINGS: Settings = {
   shortStacks: true,
   showTypes: true,
   seatChanges: 'sometimes',
+  practiceSpot: 'off',
+  lockPosition: 'off',
+  skipTrivialFolds: false,
+  hidePot: false,
+  potQuiz: false,
+  manualBet: false,
   botSpeed: 'normal',
   fourColor: true,
   unit: 'bb',
@@ -132,6 +150,12 @@ export function sanitizeSettings(raw: Partial<Settings> | null | undefined): Set
     shortStacks: typeof r.shortStacks === 'boolean' ? r.shortStacks : d.shortStacks,
     showTypes: typeof r.showTypes === 'boolean' ? r.showTypes : d.showTypes,
     seatChanges: pick(r.seatChanges, ['off', 'sometimes', 'often'] as const, d.seatChanges),
+    practiceSpot: typeof r.practiceSpot === 'string' && (r.practiceSpot === 'off' || SPOTS.some((x) => x.id === r.practiceSpot)) ? r.practiceSpot : 'off',
+    lockPosition: pick(r.lockPosition, ['off', ...POSITION_NAMES] as const, d.lockPosition),
+    skipTrivialFolds: typeof r.skipTrivialFolds === 'boolean' ? r.skipTrivialFolds : d.skipTrivialFolds,
+    hidePot: typeof r.hidePot === 'boolean' ? r.hidePot : d.hidePot,
+    potQuiz: typeof r.potQuiz === 'boolean' ? r.potQuiz : d.potQuiz,
+    manualBet: typeof r.manualBet === 'boolean' ? r.manualBet : d.manualBet,
     botSpeed: pick(r.botSpeed, ['fast', 'normal', 'slow'] as const, d.botSpeed),
     fourColor: typeof r.fourColor === 'boolean' ? r.fourColor : d.fourColor,
     unit: pick(r.unit, ['bb', 'chips'] as const, d.unit),

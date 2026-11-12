@@ -68,6 +68,9 @@ export function ActionPanel() {
   const settings = useGame((s) => s.settings);
   const heroAct = useGame((s) => s.heroAct);
   const nextHand = useGame((s) => s.nextHand);
+  const potQuiz = useGame((s) => s.potQuiz);
+  const answerPotQuiz = useGame((s) => s.answerPotQuiz);
+  const [guessText, setGuessText] = useState('');
 
   const settled = hand ? revealCount >= hand.board.length : true;
   const deciding = phase === 'playing' && hand !== null && legal !== null && settled;
@@ -150,6 +153,39 @@ export function ActionPanel() {
     );
   }
 
+  if (potQuiz && potQuiz.guess === null) {
+    const submit = () => {
+      const v = Number(guessText);
+      if (!Number.isFinite(v) || v <= 0) return;
+      answerPotQuiz(Math.round(fromDisplay(v, settings)));
+      setGuessText('');
+    };
+    return (
+      <div className="action-panel">
+        <div className="pot-quiz">
+          <span className="pot-quiz-q">{messages.live.potQuestion}</span>
+          <div className="slider-row">
+            <input
+              className="amount-input pot-quiz-input"
+              type="number"
+              inputMode="decimal"
+              autoFocus
+              value={guessText}
+              onChange={(e) => setGuessText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submit();
+              }}
+            />
+            <span className="amount-unit">{settings.unit === 'bb' ? 'BB' : ''}</span>
+            <button className="btn btn-primary" onClick={submit}>
+              {messages.live.answer}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const hero = hand.players[HERO]!;
   const a = messages.action;
   const callLabel = legal!.canCheck
@@ -161,11 +197,20 @@ export function ActionPanel() {
     : `${legal!.raiseType === 'bet' ? a.betAmount : a.raiseTo} ${formatAmount(raiseTo, settings)}`;
   const sliderMax = Math.max(legal!.minRaiseTo, legal!.maxRaiseTo);
 
+  const manual = settings.manualBet;
   return (
     <div className="action-panel">
+      {potQuiz && potQuiz.guess !== null && (
+        <div className={`pot-quiz-result ${potQuiz.correct ? 'amount-win' : 'amount-lose'}`}>
+          {fmt(potQuiz.correct ? messages.live.potRight : messages.live.potWrong, {
+            pot: formatAmount(potQuiz.answer, settings, true),
+            guess: formatAmount(potQuiz.guess, settings, true),
+          })}
+        </div>
+      )}
       {legal!.canRaise && (
         <div className="sizing">
-          <div className="presets">
+          {!manual && <div className="presets">
             {presets.map((p) => (
               <button
                 key={`${p.label}-${p.to}`}
@@ -175,9 +220,9 @@ export function ActionPanel() {
                 {p.label}
               </button>
             ))}
-          </div>
+          </div>}
           <div className="slider-row">
-            <input
+            {!manual && <input
               className="amount-slider"
               type="range"
               min={legal!.minRaiseTo}
@@ -188,7 +233,8 @@ export function ActionPanel() {
                 const v = Number(e.target.value);
                 setAmount(v > sliderMax - STEP ? sliderMax : v);
               }}
-            />
+            />}
+            {manual && <span className="manual-label">{messages.live.manualLabel}</span>}
             <input
               className="amount-input"
               type="number"

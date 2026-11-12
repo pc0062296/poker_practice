@@ -331,6 +331,46 @@ export const zhTW = {
 
   keys: { fold: 'F', call: 'C', raise: 'R', next: '空白鍵' },
 
+  spots: {
+    label: '練習',
+    off: '一般牌桌',
+    bbVsBtn: 'BB 防守 BTN 開池',
+    vsLimpers: 'BTN 面對兩家平跟',
+    squeeze: 'BTN 面對開池加跟注',
+    facing3bet: 'CO 開池後被 BTN 3bet',
+    btnVsBb: 'BTN 開池、BB 跟注（翻牌開始）',
+    coVsBtn: 'CO 開池、BTN 跟注（翻牌開始）',
+    bbVsCo: 'BB 跟注 CO 開池（翻牌開始）',
+    threeBetPot: 'BTN 3bet、CO 跟注（翻牌開始）',
+    limpedPot: '五人平跟底池（翻牌開始）',
+    unavailable: '這個練習需要更多人的牌桌',
+  } as Record<string, string>,
+
+  live: {
+    section: '線下實戰模式',
+    note: '模擬線下：看不到底池數字、自己輸入下注金額、不知道對手類型，偶爾考你底池多少。',
+    enableAll: '一鍵開啟線下實戰模式',
+    hidePot: '隱藏底池數字',
+    potQuiz: '在翻後決策前考底池大小',
+    manualBet: '下注金額自己輸入（沒有快捷尺寸）',
+    potQuestion: '現在底池多少？',
+    answer: '回答',
+    potRight: '答對：底池 {pot}（你答 {guess}）',
+    potWrong: '底池是 {pot}（你答 {guess}）',
+    manualLabel: '輸入金額',
+    potHidden: '?',
+    potQuizStat: '底池心算',
+    skippedStat: '自動略過',
+  },
+
+  practice: {
+    section: '練習方式',
+    lockPosition: '固定位置',
+    off: '不固定',
+    skipTrivialFolds: '自動略過一定要棄的手牌',
+    spotNote: '練習局面也可以在牌桌上方切換。',
+  },
+
   errors: {
     title: '這個畫面出了問題',
     body: '可以重試，或切換到其他畫面。你的資料不受影響。',

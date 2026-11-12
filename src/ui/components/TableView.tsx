@@ -55,6 +55,7 @@ export function TableView() {
       showTurn={phase === 'playing'}
       seats={seatInfo}
       settings={settings}
+      hidePot={settings.hidePot && phase !== 'handOver'}
     />
   );
 }
@@ -75,6 +76,8 @@ export interface TableCanvasProps {
   known?: (seat: number) => boolean;
   /** Show the type tag even when types are hidden in the settings. */
   showTypes?: boolean;
+  /** Live mode: do not show the pot amount. */
+  hidePot?: boolean;
 }
 
 /** Draws a table for any hand state. */
@@ -89,6 +92,7 @@ export function TableCanvas({
   settings,
   known = () => true,
   showTypes = settings.showTypes,
+  hidePot = false,
 }: TableCanvasProps) {
   const HERO = heroIndex;
   const areaRef = useRef<HTMLDivElement>(null);
@@ -138,7 +142,9 @@ export function TableCanvas({
           {showPot && (
             <div className="pot">
               <span className="pot-label">{messages.table.pot}</span>
-              <span className="pot-amount">{formatAmount(over && result ? potAfterRake(hand) : pot, settings, true)}</span>
+              <span className="pot-amount">
+                {hidePot ? messages.live.potHidden : formatAmount(over && result ? potAfterRake(hand) : pot, settings, true)}
+              </span>
             </div>
           )}
           <div className="board">
@@ -218,7 +224,7 @@ export function TableCanvas({
           hand.players.map((p, i) =>
             p.betThisStreet > 0 && !hand.isComplete ? (
               <div key={`bet-${i}`} className="bet" style={pos(lerp(layout.seats[i]!, layout.center, betPull(layout.portrait, i === HERO)))}>
-                <span className="chip" />
+                <span className="bet-chip" />
                 {formatAmount(p.betThisStreet, settings)}
               </div>
             ) : null,

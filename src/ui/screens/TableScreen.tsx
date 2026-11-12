@@ -1,11 +1,35 @@
 import { useEffect, useState } from 'react';
 import { fmt, messages } from '../../i18n';
+import { assignPositions } from '../../engine/positions';
+import { SPOTS, spotById, spotFits } from '../../game/spots';
 import { useGame } from '../../store/gameStore';
 import { UNITS_PER_BB } from '../../store/settings';
 import { ActionPanel } from '../components/ActionPanel';
 import { Sidebar } from '../components/Sidebar';
 import { TableView } from '../components/TableView';
 import { formatAmount, formatSigned } from '../format';
+
+function PracticePicker() {
+  const settings = useGame((s) => s.settings);
+  const applySettings = useGame((s) => s.applySettings);
+  const fits = (id: string) => {
+    const spot = spotById(id);
+    return !spot || spotFits(spot, assignPositions(settings.numPlayers, 0));
+  };
+  return (
+    <label className="practice-picker">
+      <span className="stat-label">{messages.spots.label}</span>
+      <select className="select" value={settings.practiceSpot} onChange={(e) => applySettings({ ...settings, practiceSpot: e.target.value })}>
+        <option value="off">{messages.spots.off}</option>
+        {SPOTS.map((spot) => (
+          <option key={spot.id} value={spot.id} disabled={!fits(spot.id)}>
+            {messages.spots[spot.id]}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function StatsStrip({ onSidebar }: { onSidebar: () => void }) {
   const stats = useGame((s) => s.stats);
@@ -27,8 +51,13 @@ function StatsStrip({ onSidebar }: { onSidebar: () => void }) {
     { label: t.postflop, value: postflopAccuracy === null ? t.none : `${postflopAccuracy}%` },
     { label: t.evLoss, value: evLoss === null ? t.none : evLoss.toFixed(1), wide: true },
   ];
+  if (settings.potQuiz && stats.potQuizTotal > 0) {
+    items.push({ label: messages.live.potQuizStat, value: `${stats.potQuizRight}/${stats.potQuizTotal}` });
+  }
+  if (stats.skipped > 0) items.push({ label: messages.live.skippedStat, value: String(stats.skipped), wide: true });
   return (
     <div className="stats-strip">
+      <PracticePicker />
       {items.map((item) => (
         <div key={item.label} className={`strip-stat ${item.wide ? 'stat-wide' : ''}`}>
           <span className="stat-label">{item.label}</span>

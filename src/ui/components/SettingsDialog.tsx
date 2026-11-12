@@ -1,5 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import { SEAT_PROFILE_IDS, type CustomProfileSettings, type ProfileId } from '../../bots/profiles';
+import { assignPositions } from '../../engine/positions';
+import type { PositionName } from '../../engine/types';
+import { SPOTS } from '../../game/spots';
+
+const POSITION_ORDER: PositionName[] = ['UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
 import { fmt, messages } from '../../i18n';
 import { useGame } from '../../store/gameStore';
 import { needsRestart, sanitizeSettings, type Settings } from '../../store/settings';
@@ -236,6 +241,63 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         <label className="check">
           <input type="checkbox" checked={draft.shortStacks} onChange={(e) => patch({ shortStacks: e.target.checked })} />
           {t.shortStacks}
+        </label>
+      </Row>
+
+      <h3 className="settings-section">{messages.practice.section}</h3>
+      <Row label={messages.spots.label}>
+        <select className="select" value={draft.practiceSpot} onChange={(e) => patch({ practiceSpot: e.target.value })}>
+          <option value="off">{messages.spots.off}</option>
+          {SPOTS.map((spot) => (
+            <option key={spot.id} value={spot.id}>
+              {messages.spots[spot.id]}
+            </option>
+          ))}
+        </select>
+      </Row>
+      <Row label={messages.practice.lockPosition}>
+        <select className="select" value={draft.lockPosition} onChange={(e) => patch({ lockPosition: e.target.value as Settings['lockPosition'] })}>
+          <option value="off">{messages.practice.off}</option>
+          {assignPositions(draft.numPlayers, 0)
+            .slice()
+            .sort((a, b) => POSITION_ORDER.indexOf(a) - POSITION_ORDER.indexOf(b))
+            .map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+        </select>
+      </Row>
+      <Row label="">
+        <label className="check">
+          <input type="checkbox" checked={draft.skipTrivialFolds} onChange={(e) => patch({ skipTrivialFolds: e.target.checked })} />
+          {messages.practice.skipTrivialFolds}
+        </label>
+      </Row>
+
+      <h3 className="settings-section">{messages.live.section}</h3>
+      <p className="settings-note">{messages.live.note}</p>
+      <Row label="">
+        <button
+          type="button"
+          className="btn btn-plain btn-small"
+          onClick={() => patch({ hidePot: true, potQuiz: true, manualBet: true, showTypes: false })}
+        >
+          {messages.live.enableAll}
+        </button>
+      </Row>
+      <Row label="">
+        <label className="check">
+          <input type="checkbox" checked={draft.hidePot} onChange={(e) => patch({ hidePot: e.target.checked })} />
+          {messages.live.hidePot}
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={draft.potQuiz} onChange={(e) => patch({ potQuiz: e.target.checked })} />
+          {messages.live.potQuiz}
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={draft.manualBet} onChange={(e) => patch({ manualBet: e.target.checked })} />
+          {messages.live.manualBet}
         </label>
       </Row>
 

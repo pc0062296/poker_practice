@@ -631,7 +631,7 @@ input:focus-visible {
   animation: pop-in 0.18s ease-out;
 }
 
-.chip {
+.bet-chip {
   width: calc(var(--u) * 1.7);
   height: calc(var(--u) * 1.7);
   border-radius: 50%;
@@ -2649,4 +2649,49 @@ input:focus-visible {
   color: #ff9a8c;
   font-size: 12px;
   white-space: pre-wrap;
+}
+
+/* ---------- Practice and live mode ---------- */
+
+.practice-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.practice-picker .select {
+  max-width: 220px;
+  padding: 3px 6px;
+}
+
+.pot-quiz {
+  flex: 1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+}
+
+.pot-quiz-q {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pot-quiz-input {
+  width: 140px;
+  font-size: 18px;
+}
+
+.pot-quiz-result {
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.manual-label {
+  flex: 1;
+  text-align: right;
+  font-size: 13px;
+  color: var(--muted);
 }
