@@ -6,9 +6,11 @@ import type { Action, HandState, LegalActions } from '../engine/types';
 import { HandRunner } from '../game/handRunner';
 import { assignProfiles, drawBotBuyIn, maybeChangeSeat, observerPolicy, seatPolicies } from '../game/lineup';
 import { countHand, emptyCounts, type StatCounts } from '../game/stats';
+import { gradeInBackground } from '../grading/client';
+import type { GradingJob, PostflopGrade } from '../grading/postflop';
 import { gradePreflopDecision, type PreflopGrade, type PreflopVerdict } from '../grading/preflop';
 import { fmt, messages } from '../i18n';
-import { countHands, saveHand } from '../storage/handStore';
+import { countHands, saveHand, updateHand } from '../storage/handStore';
 import {
   loadSettings,
   needsRestart,
@@ -25,11 +27,22 @@ export const HERO = 0;
 export type Phase = 'welcome' | 'playing' | 'handOver';
 
 export interface HistoryEntry {
+  /** Unique within this visit. */
+  key: number;
   id: number;
   time: number;
   hand: HandState;
   grades: PreflopGrade[];
+  /** Postflop grades; null while they are being computed. */
+  postflop: PostflopGrade[] | null;
   heroNet: number;
+  /** Seat profiles during the hand. */
+  profiles: string[];
+  /** Id in device storage, once saved. */
+  storedId: number | null;
+  /** Grades that arrived while grading is still running. */
+  partialPostflop?: PostflopGrade[];
+  gradingFailed?: boolean;
 }
 
 export interface SessionStats {
@@ -40,6 +53,12 @@ export interface SessionStats {
   graded: number;
   /** Graded decisions rated best or acceptable. */
   good: number;
+  /** Postflop decisions graded. */
+  postflopGraded: number;
+  /** Postflop decisions rated best or acceptable. */
+  postflopGood: number;
+  /** Total EV given up on postflop decisions, in chips. */
+  evLoss: number;
 }
 
 export interface SeatInfo {
@@ -87,7 +106,7 @@ export interface GameState {
   dismissNotice(): void;
 }
 
-const EMPTY_STATS: SessionStats = { hands: 0, net: 0, graded: 0, good: 0 };
+const EMPTY_STATS: SessionStats = { hands: 0, net: 0, graded: 0, good: 0, postflopGraded: 0, postflopGood: 0, evLoss: 0 };
 const HISTORY_LIMIT = 100;
 const BOT_DELAY_MS = { fast: 220, normal: 600, slow: 1000 } as const;
 const REVEAL_DELAY_MS = { fast: 300, normal: 500, slow: 700 } as const;
@@ -99,6 +118,7 @@ let session: Session | null = null;
 let runner: HandRunner | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let toastId = 0;
+let entryKey = 0;
 let noticeId = 0;
 
 function clearTimer(): void {
@@ -112,6 +132,14 @@ export const useGame = create<GameState>((set, get) => {
   const publish = (): void => {
     if (!runner) return;
     set({ hand: cloneHand(runner.hand), legal: runner.heroToAct ? runner.currentLegal : null });
+  };
+
+  /** Patch a history entry (and the last hand, when it is the same one). */
+  const updateEntry = (key: number, patch: Partial<HistoryEntry>): void => {
+    set((s) => ({
+      history: s.history.map((e) => (e.key === key ? { ...e, ...patch } : e)),
+      lastHand: s.lastHand && s.lastHand.key === key ? { ...s.lastHand, ...patch } : s.lastHand,
+    }));
   };
 
   const seatInfo = (s: Session): SeatInfo[] => s.seats.map((seat) => ({ name: seat.name, profile: seat.profile }));
@@ -156,7 +184,19 @@ export const useGame = create<GameState>((set, get) => {
     }
     const heroNet = hand.result!.net[HERO]!;
     const time = Date.now();
-    const entry: HistoryEntry = { id: hand.handId, time, hand: cloneHand(hand), grades, heroNet };
+    const profiles = session.seats.map((s) => s.profile);
+    const needsPostflop = runner.decisions.some((d) => d.street !== 'preflop');
+    const entry: HistoryEntry = {
+      key: ++entryKey,
+      id: hand.handId,
+      time,
+      hand: cloneHand(hand),
+      grades,
+      postflop: needsPostflop ? null : [],
+      heroNet,
+      profiles,
+      storedId: null,
+    };
 
     const state = get();
     const seatCounts = state.seatCounts.map((c) => ({ ...c }));
@@ -164,22 +204,53 @@ export const useGame = create<GameState>((set, get) => {
     countHand(hand, seatCounts);
     const counted = grades.filter((g) => g.verdict !== 'ungraded');
     const stats: SessionStats = {
+      ...state.stats,
       hands: state.stats.hands + 1,
       net: seatNet(session.seats[HERO]!),
       graded: state.stats.graded + counted.length,
       good: state.stats.good + counted.filter((g) => g.verdict === 'best' || g.verdict === 'ok').length,
     };
     const history = [entry, ...state.history].slice(0, HISTORY_LIMIT);
+    const record = toHandRecord(hand, time);
 
-    void saveHand({
-      time,
-      heroIndex: HERO,
-      heroNet,
-      record: toHandRecord(hand, time),
-      preflopGrades: grades,
-    }).then((ok) => {
-      if (ok) set((s) => ({ storedHands: (s.storedHands ?? 0) + 1 }));
+    const saved = saveHand({ time, heroIndex: HERO, heroNet, record, preflopGrades: grades, profiles }).then((id) => {
+      if (id !== null) {
+        set((s) => ({ storedHands: (s.storedHands ?? 0) + 1 }));
+        updateEntry(entry.key, { storedId: id });
+      }
+      return id;
     });
+
+    if (needsPostflop) {
+      const job: GradingJob = {
+        record,
+        heroIndex: HERO,
+        profiles,
+        custom: state.settings.customProfile,
+        useActualTypes: state.settings.showTypes,
+        sizing: { openSize: state.settings.openSizeBB },
+      };
+      const partial: PostflopGrade[] = [];
+      gradeInBackground(job, (grade) => {
+        partial.push(grade);
+        updateEntry(entry.key, { postflop: null, partialPostflop: partial.slice() });
+      })
+        .then((postflop) => {
+          updateEntry(entry.key, { postflop, partialPostflop: undefined });
+          set((s) => ({
+            stats: {
+              ...s.stats,
+              postflopGraded: s.stats.postflopGraded + postflop.length,
+              postflopGood: s.stats.postflopGood + postflop.filter((g) => g.verdict === 'best' || g.verdict === 'ok').length,
+              evLoss: s.stats.evLoss + postflop.reduce((sum, g) => sum + g.loss, 0),
+            },
+          }));
+          void saved.then((id) => {
+            if (id !== null) void updateHand(id, { postflopGrades: postflop });
+          });
+        })
+        .catch(() => updateEntry(entry.key, { postflop: [], gradingFailed: true }));
+    }
 
     const skipped = hand.players[HERO]!.folded && state.settings.skipAfterFold;
     if (skipped) {

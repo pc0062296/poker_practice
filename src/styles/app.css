@@ -1635,3 +1635,166 @@ input:focus-visible {
   font-size: 12.5px;
   color: var(--muted);
 }
+
+/* ---------- Postflop grades ---------- */
+
+.grade-blunder {
+  border-left-color: #c2185b;
+}
+
+.badge-blunder {
+  background: rgba(194, 24, 91, 0.25);
+  color: #ff8ab8;
+}
+
+.grade-board {
+  margin-left: 8px;
+  font-weight: 500;
+  color: #c3ccd8;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ev-table {
+  width: 100%;
+  margin: 2px 0 4px;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ev-table th {
+  padding: 2px 0;
+  text-align: left;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ev-table th:last-child,
+.ev-value {
+  text-align: right;
+}
+
+.ev-table td {
+  padding: 3px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ev-chosen td {
+  font-weight: 700;
+}
+
+.ev-tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ev-tag-best {
+  background: rgba(53, 184, 119, 0.22);
+  color: #6fe0a6;
+}
+
+.grade-line {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.grade-note-inline {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: #c3ccd8;
+  font-variant-numeric: tabular-nums;
+}
+
+.villain {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.villain-head {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.villain-head .seat-type {
+  font-size: 11px;
+  padding: 0 5px;
+  border-radius: 5px;
+}
+
+.mix-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mix {
+  min-width: 3px;
+}
+
+.mix-strong {
+  background: #d9503f;
+}
+
+.mix-medium {
+  background: #e9952b;
+}
+
+.mix-draw {
+  background: #3f82e6;
+}
+
+.mix-weak {
+  background: #4a586b;
+}
+
+.mix-text {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 5px 0 2px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.grading-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--gold);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

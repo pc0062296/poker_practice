@@ -65,6 +65,8 @@ export interface PostflopGrade {
   exact: boolean;
   /** True when the gap is within the sampling error. */
   uncertain: boolean;
+  /** True when later streets of a multiway pot were valued as checked down. */
+  checkdown: boolean;
   /** Hero's chance to win at showdown against the ranges, if the hand were checked down. */
   equity: number;
   /** Share of all ranges the hero needs to win to call (facing a bet). */
@@ -371,6 +373,7 @@ function gradeDecision(
     verdict,
     exact: result.exact,
     uncertain,
+    checkdown: result.checkdown,
     equity: equityVsRanges(hand, heroIndex, weights),
     potOdds: toCall > 0 ? toCall / (pot + toCall) : null,
     mdf: toCall > 0 ? (pot - toCall) / pot : null,

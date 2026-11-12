@@ -4,7 +4,7 @@ import { fmt, messages } from '../../i18n';
 import { useGame, type HistoryEntry } from '../../store/gameStore';
 import type { Settings } from '../../store/settings';
 import { describeEvent } from '../format';
-import { FeedbackPanel, GradeCard, HandSummary } from './Feedback';
+import { EntryGrades, FeedbackPanel, HandSummary } from './Feedback';
 import { OpponentsPanel } from './OpponentsPanel';
 
 type Tab = 'feedback' | 'log' | 'history' | 'opponents';
@@ -67,9 +67,7 @@ function HistoryRow({ entry, settings }: { entry: HistoryEntry; settings: Settin
       </button>
       {open && (
         <div className="history-body">
-          {entry.grades.map((g, i) => (
-            <GradeCard key={i} grade={g} settings={settings} />
-          ))}
+          <EntryGrades entry={entry} settings={settings} />
           {logLines(entry.hand, settings, 5, true).map((line, i) => (
             <div key={i} className={line.street ? 'log-line log-street' : 'log-line'}>
               {line.text}
@@ -88,7 +86,7 @@ function HistoryPanel() {
   return (
     <div className="history">
       {history.map((entry) => (
-        <HistoryRow key={`${entry.time}-${entry.id}`} entry={entry} settings={settings} />
+        <HistoryRow key={entry.key} entry={entry} settings={settings} />
       ))}
     </div>
   );

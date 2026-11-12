@@ -7,6 +7,7 @@ import { HERO, useGame, type HistoryEntry } from '../../store/gameStore';
 import type { Settings } from '../../store/settings';
 import { cardText, formatAmount, formatSigned } from '../format';
 import { Modal } from './Modal';
+import { PostflopCard } from './PostflopCard';
 import { RangeGrid } from './RangeGrid';
 
 /** Describe the preflop spot in words. */
@@ -104,7 +105,31 @@ export function HandSummary({ entry, settings }: { entry: HistoryEntry; settings
   );
 }
 
-/** Preflop grades for the most recently finished hand. */
+/** All grades of a hand: preflop from the charts, postflop from the evaluator. */
+export function EntryGrades({ entry, settings }: { entry: HistoryEntry; settings: Settings }) {
+  const postflop = entry.postflop ?? entry.partialPostflop ?? [];
+  const nothing = entry.grades.length === 0 && entry.postflop !== null && entry.postflop.length === 0 && !entry.gradingFailed;
+  return (
+    <>
+      {nothing && <p className="panel-empty">{messages.feedback.noDecision}</p>}
+      {entry.grades.map((g, i) => (
+        <GradeCard key={`p${i}`} grade={g} settings={settings} />
+      ))}
+      {postflop.map((g) => (
+        <PostflopCard key={`f${g.actionIndex}`} grade={g} settings={settings} />
+      ))}
+      {entry.postflop === null && (
+        <p className="grading-pending">
+          <span className="spinner" aria-hidden="true" />
+          {messages.postflop.pending}
+        </p>
+      )}
+      {entry.gradingFailed && <p className="grade-note">{messages.postflop.failed}</p>}
+    </>
+  );
+}
+
+/** Grades for the most recently finished hand. */
 export function FeedbackPanel() {
   const last = useGame((s) => s.lastHand);
   const settings = useGame((s) => s.settings);
@@ -113,11 +138,8 @@ export function FeedbackPanel() {
     <div className="feedback">
       <h3 className="panel-title">{messages.feedback.title}</h3>
       <HandSummary entry={last} settings={settings} />
-      {last.grades.length === 0 ? (
-        <p className="panel-empty">{messages.feedback.noDecision}</p>
-      ) : (
-        last.grades.map((g, i) => <GradeCard key={i} grade={g} settings={settings} />)
-      )}
+      <EntryGrades entry={last} settings={settings} />
+      <p className="grade-note">{messages.postflop.note}</p>
     </div>
   );
 }

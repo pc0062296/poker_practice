@@ -14,6 +14,8 @@ function TopBar({ onSettings, onSidebar }: { onSettings: () => void; onSidebar: 
   const t = messages.stats;
   const winRate = stats.hands > 0 ? (stats.net / UNITS_PER_BB / stats.hands) * 100 : null;
   const accuracy = stats.graded > 0 ? Math.round((stats.good / stats.graded) * 100) : null;
+  const postflopAccuracy = stats.postflopGraded > 0 ? Math.round((stats.postflopGood / stats.postflopGraded) * 100) : null;
+  const evLoss = stats.hands > 0 ? (stats.evLoss / UNITS_PER_BB / stats.hands) * 100 : null;
   return (
     <header className="topbar">
       <div className="brand">
@@ -40,6 +42,14 @@ function TopBar({ onSettings, onSidebar }: { onSettings: () => void; onSidebar: 
         <div className="stat">
           <span className="stat-label">{t.preflop}</span>
           <span className="stat-value">{accuracy === null ? t.none : `${accuracy}%`}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">{t.postflop}</span>
+          <span className="stat-value">{postflopAccuracy === null ? t.none : `${postflopAccuracy}%`}</span>
+        </div>
+        <div className="stat stat-wide">
+          <span className="stat-label">{t.evLoss}</span>
+          <span className="stat-value">{evLoss === null || stats.postflopGraded === 0 ? t.none : evLoss.toFixed(1)}</span>
         </div>
       </div>
       <div className="topbar-actions">
