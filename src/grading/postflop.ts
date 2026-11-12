@@ -68,6 +68,8 @@ export interface PostflopGrade {
   uncertain: boolean;
   /** True when later streets of a multiway pot were valued as checked down. */
   checkdown: boolean;
+  /** Only one opponent is left (the solver can give a reference). */
+  headsUp?: boolean;
   /** Hero's chance to win at showdown against the ranges, if the hand were checked down. */
   equity: number;
   /** Share of all ranges the hero needs to win to call (facing a bet). */
@@ -377,6 +379,7 @@ function gradeDecision(
     exact: result.exact,
     uncertain,
     checkdown: result.checkdown,
+    headsUp: hand.players.filter((p) => !p.folded).length === 2,
     equity: equityVsRanges(hand, heroIndex, weights),
     potOdds: toCall > 0 ? toCall / (pot + toCall) : null,
     mdf: toCall > 0 ? (pot - toCall) / pot : null,

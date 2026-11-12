@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CLASS_LABELS } from '../../eval/handClass';
 import type { PreflopChoice, PreflopGrade } from '../../grading/preflop';
 import { fmt, messages } from '../../i18n';
-import { getChart } from '../../ranges/charts';
+import { allChartOverrides, getChart } from '../../ranges/charts';
 import { toHandRecord } from '../../engine/hand';
 import { reviewFromRecord } from '../../review/model';
 import { HERO, useGame, type HistoryEntry } from '../../store/gameStore';
@@ -120,7 +120,21 @@ export function EntryGrades({ entry, settings }: { entry: HistoryEntry; settings
         <GradeCard key={`p${i}`} grade={g} settings={settings} />
       ))}
       {postflop.map((g) => (
-        <PostflopCard key={`f${g.actionIndex}`} grade={g} settings={settings} />
+        <PostflopCard
+          key={`f${g.actionIndex}`}
+          grade={g}
+          settings={settings}
+          solveJob={(actionIndex) => ({
+            record: toHandRecord(entry.hand, entry.time),
+            heroIndex: HERO,
+            profiles: entry.profiles,
+            custom: settings.customProfile,
+            useActualTypes: settings.showTypes,
+            sizing: { openSize: settings.openSizeBB },
+            chartOverrides: allChartOverrides(),
+            actionIndex,
+          })}
+        />
       ))}
       {entry.postflop === null && (
         <p className="grading-pending">

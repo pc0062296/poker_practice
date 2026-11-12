@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { Action } from '../../engine/types';
+import { solveInBackground } from '../../grading/client';
 import type { PostflopGrade } from '../../grading/postflop';
+import type { SolveJob, SolverReference } from '../../solver/reference';
 import { fmt, messages } from '../../i18n';
 import type { Settings } from '../../store/settings';
 import { cardText, formatAmount } from '../format';
@@ -30,8 +32,24 @@ function signedBB(chips: number, settings: Settings): string {
 
 const pct = (x: number) => Math.round(x * 100);
 
-export function PostflopCard({ grade, settings }: { grade: PostflopGrade; settings: Settings }) {
+interface PostflopCardProps {
+  grade: PostflopGrade;
+  settings: Settings;
+  /** Builds the solver job for this decision; when given, heads-up turn and river cards offer a solve. */
+  solveJob?: (actionIndex: number) => SolveJob;
+}
+
+export function PostflopCard({ grade, settings, solveJob }: PostflopCardProps) {
   const [open, setOpen] = useState(false);
+  const [reference, setReference] = useState<SolverReference | null | 'pending' | 'failed'>(null);
+  const canSolve = !!solveJob && grade.headsUp === true && (grade.street === 'turn' || grade.street === 'river');
+  const runSolve = () => {
+    if (!solveJob) return;
+    setReference('pending');
+    solveInBackground(solveJob(grade.actionIndex))
+      .then((r) => setReference(r ?? 'failed'))
+      .catch(() => setReference('failed'));
+  };
   const t = messages.postflop;
   const street = messages.street[grade.street];
   const title = fmt(t.situation[grade.situation]!, { street, amount: formatAmount(grade.toCall, settings, true) });
@@ -133,6 +151,49 @@ export function PostflopCard({ grade, settings }: { grade: PostflopGrade; settin
         </div>
       )}
       <p className="grade-note">{grade.model === 'actual' ? t.modelActual : t.modelObserver}</p>
+
+      {canSolve && reference === null && (
+        <button className="btn btn-plain btn-small solve-button" onClick={runSolve}>
+          {t.solve}
+        </button>
+      )}
+      {reference === 'pending' && (
+        <p className="grading-pending">
+          <span className="spinner" aria-hidden="true" />
+          {t.solving}
+        </p>
+      )}
+      {reference === 'failed' && <p className="grade-note">{t.solveFailed}</p>}
+      {reference && typeof reference === 'object' && (
+        <div className="solve">
+          <div className="villain-head">{fmt(t.solveTitle, { street: messages.street[reference.street] })}</div>
+          <table className="ev-table">
+            <thead>
+              <tr>
+                <th />
+                <th className="ev-value">{t.solveHand}</th>
+                <th className="ev-value">{t.solveRange}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reference.actions.map((a, i) => (
+                <tr key={i}>
+                  <td>{actionLabel(a, grade.toCall, settings)}</td>
+                  <td className="ev-value">{pct(reference.hand[i]!)}%</td>
+                  <td className="ev-value">{pct(reference.range[i]!)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="grade-note">
+            {fmt(t.solveNote, {
+              iterations: reference.iterations,
+              x: (reference.exploitability * 100).toFixed(1),
+              s: (reference.ms / 1000).toFixed(1),
+            })}
+          </p>
+        </div>
+      )}
 
       {open && villain && (
         <Modal

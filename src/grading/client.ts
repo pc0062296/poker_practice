@@ -1,8 +1,9 @@
+import { solveReference, type SolveJob, type SolverReference } from '../solver/reference';
 import { gradePostflop, type GradingJob, type PostflopGrade } from './postflop';
 
 interface Pending {
   onGrade?: (grade: PostflopGrade) => void;
-  resolve: (grades: PostflopGrade[]) => void;
+  resolve: (reply: Reply) => void;
   reject: (error: Error) => void;
 }
 
@@ -11,6 +12,7 @@ interface Reply {
   grade?: PostflopGrade;
   done?: boolean;
   grades?: PostflopGrade[];
+  reference?: SolverReference | null;
   error?: string;
 }
 
@@ -34,7 +36,7 @@ function getWorker(): Worker | null {
     if (reply.done) {
       pending.delete(reply.id);
       if (reply.error) job.reject(new Error(reply.error));
-      else job.resolve(reply.grades ?? []);
+      else job.resolve(reply);
     }
   };
   worker.onerror = (event) => {
@@ -58,10 +60,27 @@ export function gradeInBackground(job: GradingJob, onGrade?: (grade: PostflopGra
     }
   }
   const id = nextId++;
-  return new Promise((resolve, reject) => {
+  return new Promise<Reply>((resolve, reject) => {
     pending.set(id, { onGrade, resolve, reject });
     w.postMessage({ id, job });
-  });
+  }).then((reply) => reply.grades ?? []);
+}
+
+/** Solve a heads-up turn or river decision off the main thread (null when not applicable). */
+export function solveInBackground(job: SolveJob): Promise<SolverReference | null> {
+  const w = getWorker();
+  if (!w) {
+    try {
+      return Promise.resolve(solveReference(job));
+    } catch (error) {
+      return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  const id = nextId++;
+  return new Promise<Reply>((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    w.postMessage({ id, kind: 'solve', job });
+  }).then((reply) => reply.reference ?? null);
 }
 
 /** Number of hands still waiting to be graded. */

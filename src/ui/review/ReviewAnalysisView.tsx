@@ -99,6 +99,16 @@ export function ReviewAnalysisView({ review, onEdit, onBack }: Props) {
   }, [total]);
 
   const grades = postflop ?? partial;
+  const solveJob = (actionIndex: number) => ({
+    record: toRecord(review),
+    heroIndex: 0,
+    profiles: review.profiles,
+    custom: settings.customProfile,
+    useActualTypes: true,
+    sizing: { openSize: settings.openSizeBB },
+    chartOverrides: allChartOverrides(),
+    actionIndex,
+  });
   const nextStep = analysis.steps[step];
   const heroNext = nextStep?.actor === 0;
   const preflopHere = heroNext ? analysis.preflop.find((g) => g.actionIndex === step) : undefined;
@@ -173,7 +183,7 @@ export function ReviewAnalysisView({ review, onEdit, onBack }: Props) {
         )}
         {heroNext && <p className="step-hero">{t.nextHeroDecision}</p>}
         {preflopHere && <GradeCard grade={preflopHere} settings={settings} />}
-        {postflopHere && <PostflopCard grade={postflopHere} settings={settings} />}
+        {postflopHere && <PostflopCard grade={postflopHere} settings={settings} solveJob={solveJob} />}
         {heroNext && nextStep && nextStep.street !== 'preflop' && !postflopHere && postflop === null && (
           <p className="grading-pending">
             <span className="spinner" aria-hidden="true" />
@@ -226,7 +236,7 @@ export function ReviewAnalysisView({ review, onEdit, onBack }: Props) {
         ))}
         {grades.map((g) => (
           <div key={`f${g.actionIndex}`} className="grade-jump" onClick={() => setStep(g.actionIndex)}>
-            <PostflopCard grade={g} settings={settings} />
+            <PostflopCard grade={g} settings={settings} solveJob={solveJob} />
           </div>
         ))}
         {postflop === null && (
