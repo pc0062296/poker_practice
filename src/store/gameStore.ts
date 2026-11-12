@@ -7,6 +7,7 @@ import { HandRunner } from '../game/handRunner';
 import { assignProfiles, drawBotBuyIn, maybeChangeSeat, observerPolicy, seatPolicies } from '../game/lineup';
 import { countHand, emptyCounts, type StatCounts } from '../game/stats';
 import { gradeInBackground } from '../grading/client';
+import { allChartOverrides } from '../ranges/charts';
 import type { GradingJob, PostflopGrade } from '../grading/postflop';
 import { gradePreflopDecision, type PreflopGrade, type PreflopVerdict } from '../grading/preflop';
 import { fmt, messages } from '../i18n';
@@ -229,6 +230,7 @@ export const useGame = create<GameState>((set, get) => {
         custom: state.settings.customProfile,
         useActualTypes: state.settings.showTypes,
         sizing: { openSize: state.settings.openSizeBB },
+        chartOverrides: allChartOverrides(),
       };
       const partial: PostflopGrade[] = [];
       gradeInBackground(job, (grade) => {

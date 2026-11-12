@@ -10,6 +10,7 @@ import { COMBO_A, COMBO_B, collapseToClasses, comboIndex, NUM_COMBOS } from '../
 import { evaluate } from '../eval/evaluator';
 import { buildStrengthTable } from '../eval/strengthTable';
 import { HandRunner } from '../game/handRunner';
+import type { ChartSpec } from '../ranges/charts';
 import { DEFAULT_SIZING, type SizingOptions } from '../ranges/sizing';
 import { evaluateDecision, type EvalBudget } from './evaluator';
 
@@ -91,6 +92,8 @@ export interface GradingJob {
   budget?: Partial<EvalBudget>;
   /** Only grade these action indices (all postflop hero decisions when omitted). */
   only?: number[];
+  /** The user's preflop charts ("depth|key"), so ranges match the main thread. */
+  chartOverrides?: Record<string, ChartSpec>;
 }
 
 function kindOf(action: Action): OptionKind {

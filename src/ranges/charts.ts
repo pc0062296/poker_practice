@@ -301,6 +301,21 @@ export function setChartOverride(key: string, depth: ChartDepth, spec: ChartSpec
   cache.delete(cacheKey);
 }
 
+/** The user's chart for a key and depth, or null when the built-in one is used. */
+export function chartOverride(key: string, depth: ChartDepth): ChartSpec | null {
+  return overrides.get(`${depth}|${key}`) ?? null;
+}
+
+/** All user charts, keyed by "depth|key". */
+export function allChartOverrides(): Record<string, ChartSpec> {
+  return Object.fromEntries(overrides);
+}
+
+/** The chart text in use: the user's version if there is one, otherwise the built-in one. */
+export function effectiveChartSpec(key: string, depth: ChartDepth): ChartSpec | null {
+  return chartOverride(key, depth) ?? builtinChartSpec(key, depth);
+}
+
 /** Every built-in chart key. */
 export function chartKeys(): string[] {
   return Object.keys(BASE);
