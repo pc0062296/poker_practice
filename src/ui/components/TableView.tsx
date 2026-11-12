@@ -4,7 +4,7 @@ import { potTotal } from '../../engine/hand';
 import type { ActionType, HandState } from '../../engine/types';
 import { bestFive } from '../../eval/evaluator';
 import { fmt, messages } from '../../i18n';
-import { HERO, useGame } from '../../store/gameStore';
+import { HERO, useGame, type SeatInfo } from '../../store/gameStore';
 import type { Settings } from '../../store/settings';
 import { formatAmount, handName } from '../format';
 import { useElementSize } from '../hooks';
@@ -38,26 +38,73 @@ function actionLabels(hand: HandState, settings: Settings): Map<number, SeatLabe
 
 const pos = (p: Point): CSSProperties => ({ left: `${p.x}%`, top: `${p.y}%` });
 
+/** The live table, driven by the game store. */
 export function TableView() {
   const hand = useGame((s) => s.hand);
   const phase = useGame((s) => s.phase);
   const revealCount = useGame((s) => s.revealCount);
   const settings = useGame((s) => s.settings);
   const seatInfo = useGame((s) => s.seats);
+  return (
+    <TableCanvas
+      hand={hand}
+      heroIndex={HERO}
+      seatCount={hand?.players.length ?? settings.numPlayers}
+      revealCount={revealCount}
+      over={phase === 'handOver'}
+      showTurn={phase === 'playing'}
+      seats={seatInfo}
+      settings={settings}
+    />
+  );
+}
 
+export interface TableCanvasProps {
+  hand: HandState | null;
+  heroIndex: number;
+  seatCount: number;
+  /** Community cards to show. */
+  revealCount: number;
+  /** The hand is over and its result is shown. */
+  over: boolean;
+  /** Highlight the player to act. */
+  showTurn: boolean;
+  seats: SeatInfo[];
+  settings: Settings;
+  /** Whether a seat's hole cards are real (false for unknown cards in a reviewed hand). */
+  known?: (seat: number) => boolean;
+  /** Show the type tag even when types are hidden in the settings. */
+  showTypes?: boolean;
+}
+
+/** Draws a table for any hand state. */
+export function TableCanvas({
+  hand,
+  heroIndex,
+  seatCount,
+  revealCount,
+  over,
+  showTurn,
+  seats: seatInfo,
+  settings,
+  known = () => true,
+  showTypes = settings.showTypes,
+}: TableCanvasProps) {
+  const HERO = heroIndex;
   const areaRef = useRef<HTMLDivElement>(null);
   const area = useElementSize(areaRef);
-  const seatCount = hand?.players.length ?? settings.numPlayers;
   const layout = useMemo(
     () => computeLayout(area.width, area.height, seatCount),
     [area.width, area.height, seatCount],
   );
 
-  const over = phase === 'handOver';
-  const result = over ? (hand?.result ?? null) : null;
+  // The result is only meaningful when every hand that reached showdown is known.
+  const resultKnown = hand?.result ? hand.players.every((p, i) => p.folded || !hand.result!.showdown || known(i)) : false;
+  const result = over && resultKnown ? (hand?.result ?? null) : null;
   const revealed = hand ? hand.board.slice(0, revealCount) : [];
   const settled = hand ? revealCount >= hand.board.length : true;
   const labels = hand && settled && !over ? actionLabels(hand, settings) : new Map<number, SeatLabel>();
+  const phase = showTurn ? 'playing' : 'idle';
 
   // Cards that make the winning hand, to highlight at showdown.
   const winningCards = useMemo(() => {
@@ -116,7 +163,7 @@ export function TableView() {
         {hand?.players.map((p, i) => {
           const seat = layout.seats[i]!;
           const isHero = i === HERO;
-          const showCards = isHero || (over && result !== null && result.showdown && !p.folded);
+          const showCards = isHero || (over && hand.result?.showdown === true && !p.folded && known(i));
           const winner = result !== null && result.winnings[i]! > 0;
           const active = phase === 'playing' && settled && hand.toAct === i;
           // Do not reveal the outcome through stack sizes while cards are still being dealt.
@@ -148,8 +195,8 @@ export function TableView() {
               <div className="seat-plate">
                 <span className="seat-pos">{p.position}</span>
                 <span className="seat-name">
-                  {p.name}
-                  {settings.showTypes && !isHero && seatInfo[i] && (
+                  {p.name !== p.position && p.name}
+                  {showTypes && !isHero && seatInfo[i] && (
                     <em className={`seat-type type-${seatInfo[i]!.profile}`}>{messages.profile[seatInfo[i]!.profile]}</em>
                   )}
                 </span>
@@ -158,7 +205,7 @@ export function TableView() {
                 </span>
               </div>
               {label && <div className={`seat-action act-${label.type}`}>{label.text}</div>}
-              {over && result && result.scores[i] != null && (
+              {over && result && result.scores[i] != null && known(i) && (
                 <div className="seat-action act-show">{handName(result.scores[i]!)}</div>
               )}
             </div>

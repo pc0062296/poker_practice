@@ -3,7 +3,11 @@ import { CLASS_LABELS } from '../../eval/handClass';
 import type { PreflopChoice, PreflopGrade } from '../../grading/preflop';
 import { fmt, messages } from '../../i18n';
 import { getChart } from '../../ranges/charts';
+import { toHandRecord } from '../../engine/hand';
+import { reviewFromRecord } from '../../review/model';
 import { HERO, useGame, type HistoryEntry } from '../../store/gameStore';
+import { useNav } from '../../store/nav';
+import { useReviewUi } from '../../store/reviewUi';
 import type { Settings } from '../../store/settings';
 import { cardText, formatAmount, formatSigned } from '../format';
 import { Modal } from './Modal';
@@ -129,6 +133,25 @@ export function EntryGrades({ entry, settings }: { entry: HistoryEntry; settings
   );
 }
 
+/** Open a hand from the practice table in the review screen. */
+export function OpenInReview({ entry }: { entry: HistoryEntry }) {
+  const open = useReviewUi((s) => s.open);
+  const setView = useNav((s) => s.setView);
+  return (
+    <button
+      className="link-button"
+      onClick={() => {
+        const review = reviewFromRecord(toHandRecord(entry.hand, entry.time), entry.profiles, HERO);
+        if (!review) return;
+        open(review, 'analyze');
+        setView('review');
+      }}
+    >
+      {messages.review.openInReview}
+    </button>
+  );
+}
+
 /** Grades for the most recently finished hand. */
 export function FeedbackPanel() {
   const last = useGame((s) => s.lastHand);
@@ -139,6 +162,7 @@ export function FeedbackPanel() {
       <h3 className="panel-title">{messages.feedback.title}</h3>
       <HandSummary entry={last} settings={settings} />
       <EntryGrades entry={last} settings={settings} />
+      <OpenInReview entry={last} />
       <p className="grade-note">{messages.postflop.note}</p>
     </div>
   );

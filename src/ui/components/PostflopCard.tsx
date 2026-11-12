@@ -111,7 +111,7 @@ export function PostflopCard({ grade, settings }: { grade: PostflopGrade; settin
       {villain && (
         <div className="villain">
           <div className="villain-head">
-            {fmt(t.villain, { name: villain.name, pos: villain.position })}
+            {villain.name === villain.position ? fmt(t.villainPos, { pos: villain.position }) : fmt(t.villain, { name: villain.name, pos: villain.position })}
             <em className={`seat-type type-${villain.profile}`}>{messages.profile[villain.profile]}</em>
           </div>
           <div className="mix-bar">
@@ -135,7 +135,10 @@ export function PostflopCard({ grade, settings }: { grade: PostflopGrade; settin
       <p className="grade-note">{grade.model === 'actual' ? t.modelActual : t.modelObserver}</p>
 
       {open && villain && (
-        <Modal title={fmt(t.rangeTitle, { name: villain.name, pos: villain.position })} onClose={() => setOpen(false)}>
+        <Modal
+          title={villain.name === villain.position ? fmt(t.rangeTitlePos, { pos: villain.position }) : fmt(t.rangeTitle, { name: villain.name, pos: villain.position })}
+          onClose={() => setOpen(false)}
+        >
           <p className="modal-sub">
             {street} {grade.board.map(cardText).join(' ')}
           </p>

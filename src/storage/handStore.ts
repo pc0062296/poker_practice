@@ -1,4 +1,5 @@
 import type { HandRecord } from '../engine/hand';
+import { openDb } from './db';
 import type { PostflopGrade } from '../grading/postflop';
 import type { PreflopGrade } from '../grading/preflop';
 
@@ -17,35 +18,7 @@ export interface StoredHand {
   profiles?: string[];
 }
 
-const DB_NAME = 'poker-practice';
-const DB_VERSION = 1;
 const STORE = 'hands';
-
-let dbPromise: Promise<IDBDatabase> | null = null;
-
-function openDb(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB is not available'));
-      return;
-    }
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE)) {
-        const store = db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-        store.createIndex('time', 'time');
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Failed to open the database'));
-  });
-  dbPromise.catch(() => {
-    dbPromise = null;
-  });
-  return dbPromise;
-}
 
 /** Save a finished hand and return its id, or null when storage failed. Never throws. */
 export async function saveHand(hand: StoredHand): Promise<number | null> {

@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { messages } from './i18n';
 import { useNav, VIEWS, type View } from './store/nav';
 import { SettingsDialog } from './ui/components/SettingsDialog';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 import { DrillScreen } from './ui/screens/DrillScreen';
 import { RangesScreen } from './ui/screens/RangesScreen';
+import { ReviewScreen } from './ui/screens/ReviewScreen';
 import { TableScreen } from './ui/screens/TableScreen';
 import { ToolsScreen } from './ui/screens/ToolsScreen';
 
 /** Screens that exist so far; the others appear as they are built. */
-const READY: View[] = ['table', 'drill', 'ranges', 'tools'];
+const READY: View[] = ['table', 'drill', 'ranges', 'tools', 'review'];
 
 function TopBar({ onSettings }: { onSettings: () => void }) {
   const view = useNav((s) => s.view);
@@ -44,10 +46,13 @@ export function App() {
   return (
     <div className="app">
       <TopBar onSettings={openSettings} />
-      {view === 'table' && <TableScreen onSettings={openSettings} />}
-      {view === 'drill' && <DrillScreen />}
-      {view === 'ranges' && <RangesScreen />}
-      {view === 'tools' && <ToolsScreen />}
+      <ErrorBoundary resetKey={view}>
+        {view === 'table' && <TableScreen onSettings={openSettings} />}
+        {view === 'drill' && <DrillScreen />}
+        {view === 'ranges' && <RangesScreen />}
+        {view === 'tools' && <ToolsScreen />}
+        {view === 'review' && <ReviewScreen />}
+      </ErrorBoundary>
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>
   );

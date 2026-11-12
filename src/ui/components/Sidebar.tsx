@@ -4,7 +4,7 @@ import { fmt, messages } from '../../i18n';
 import { useGame, type HistoryEntry } from '../../store/gameStore';
 import type { Settings } from '../../store/settings';
 import { describeEvent } from '../format';
-import { EntryGrades, FeedbackPanel, HandSummary } from './Feedback';
+import { EntryGrades, FeedbackPanel, HandSummary, OpenInReview } from './Feedback';
 import { OpponentsPanel } from './OpponentsPanel';
 
 type Tab = 'feedback' | 'log' | 'history' | 'opponents';
@@ -68,6 +68,7 @@ function HistoryRow({ entry, settings }: { entry: HistoryEntry; settings: Settin
       {open && (
         <div className="history-body">
           <EntryGrades entry={entry} settings={settings} />
+          <OpenInReview entry={entry} />
           {logLines(entry.hand, settings, 5, true).map((line, i) => (
             <div key={i} className={line.street ? 'log-line log-street' : 'log-line'}>
               {line.text}

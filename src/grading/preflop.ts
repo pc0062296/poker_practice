@@ -9,6 +9,8 @@ export type PreflopVerdict = 'best' | 'ok' | 'inaccuracy' | 'mistake' | 'ungrade
 export type PreflopChoice = 'fold' | 'call' | 'raise';
 
 export interface PreflopGrade {
+  /** Number of actions taken before this decision. */
+  actionIndex: number;
   verdict: PreflopVerdict;
   kind: ScenarioKind;
   chartKey: string | null;
@@ -77,6 +79,7 @@ export function gradePreflopDecision(record: DecisionRecord, hole: readonly [Car
   }
 
   return {
+    actionIndex: record.actionIndex,
     verdict,
     kind: scenario.kind,
     chartKey: scenario.chartKey,
