@@ -150,6 +150,8 @@ export function runSpot(runner: HandRunner, spot: SpotDef, heroIndex: number, rn
     if (scripted) step++;
   }
   if (step < spot.steps.length) return false;
+  // Scripted actions are not the hero's own decisions: do not grade them.
+  runner.decisions.length = 0;
 
   // Hero still to act before the flop: give a hand worth thinking about.
   if (!hand.isComplete && hand.street === 'preflop' && hand.toAct === heroIndex) {

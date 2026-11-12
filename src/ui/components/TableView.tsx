@@ -78,6 +78,8 @@ export interface TableCanvasProps {
   showTypes?: boolean;
   /** Live mode: do not show the pot amount. */
   hidePot?: boolean;
+  /** Show these seats' cards face up (replays with every card visible). */
+  faceUp?: (seat: number) => boolean;
 }
 
 /** Draws a table for any hand state. */
@@ -93,6 +95,7 @@ export function TableCanvas({
   known = () => true,
   showTypes = settings.showTypes,
   hidePot = false,
+  faceUp,
 }: TableCanvasProps) {
   const HERO = heroIndex;
   const areaRef = useRef<HTMLDivElement>(null);
@@ -169,7 +172,8 @@ export function TableCanvas({
         {hand?.players.map((p, i) => {
           const seat = layout.seats[i]!;
           const isHero = i === HERO;
-          const showCards = isHero || (over && hand.result?.showdown === true && !p.folded && known(i));
+          const showCards =
+            isHero || (faceUp?.(i) ?? false) || (over && hand.result?.showdown === true && !p.folded && known(i));
           const winner = result !== null && result.winnings[i]! > 0;
           const active = phase === 'playing' && settled && hand.toAct === i;
           // Do not reveal the outcome through stack sizes while cards are still being dealt.
@@ -184,7 +188,7 @@ export function TableCanvas({
           return (
             <div key={i} className={classes.join(' ')} style={pos(seat)}>
               <div className="seat-cards">
-                {!p.folded || isHero
+                {!p.folded || isHero || faceUp?.(i)
                   ? p.hole.map((c, k) => (
                       <CardView
                         key={`${hand.handId}-${k}`}

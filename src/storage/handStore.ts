@@ -16,6 +16,14 @@ export interface StoredHand {
   postflopGrades?: PostflopGrade[];
   /** Seat profiles at the time of the hand (needed to re-grade it). */
   profiles?: string[];
+  /** When the table was opened; hands of one sitting share it. */
+  sessionId?: number;
+  /** Hero's result with all-in luck removed (equal to heroNet when there was no all-in). */
+  heroEvNet?: number;
+  /** True when the hand was replayed from an earlier deal. */
+  replay?: boolean;
+  /** Practice spot the hand started from, if any. */
+  spot?: string;
 }
 
 const STORE = 'hands';

@@ -29,6 +29,8 @@ export interface ReviewHand {
   shown: (Card[] | null)[];
   /** Player type the user assigns to each seat (index 0 is ignored). */
   profiles: string[];
+  /** Everyone's real cards, for hands from the practice table (used only for display). */
+  allHoles?: Card[][];
 }
 
 export const BB = 100;
@@ -92,6 +94,13 @@ export function reviewPositions(review: ReviewHand): PositionName[] {
 function holeCards(review: ReviewHand): Card[][] {
   const used = new Set<Card>([...review.heroCards, ...review.board]);
   for (const s of review.shown) for (const c of s ?? []) used.add(c);
+  const fixed = new Set(used);
+  // Real cards from the practice table are used when they do not clash with what was entered.
+  const real = (i: number) => {
+    const h = review.allHoles?.[i];
+    return h && h.length === 2 && !h.some((c) => fixed.has(c)) ? h : null;
+  };
+  for (let i = 1; i < review.numPlayers; i++) for (const c of real(i) ?? []) used.add(c);
   const free: Card[] = [];
   for (let c = 51; c >= 0; c--) if (!used.has(c)) free.push(c);
   return Array.from({ length: review.numPlayers }, (_, i) => {
@@ -99,6 +108,8 @@ function holeCards(review: ReviewHand): Card[][] {
     if (i === 0) return review.heroCards.length === 2 ? review.heroCards.slice() : [free.pop()!, free.pop()!];
     const shown = review.shown[i];
     if (shown && shown.length === 2) return shown.slice();
+    const r = real(i);
+    if (r) return r.slice();
     return [free.pop()!, free.pop()!];
   });
 }
@@ -216,6 +227,7 @@ export function reviewFromRecord(record: HandRecord, profiles: string[], heroInd
     actions: record.actions.slice(),
     shown,
     profiles: profiles.slice(),
+    allHoles: record.holeCards.map((h) => [h[0], h[1]]),
   };
 }
 

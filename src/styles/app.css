@@ -2695,3 +2695,162 @@ input:focus-visible {
   font-size: 13px;
   color: var(--muted);
 }
+
+/* ---------- Records and report ---------- */
+
+.records {
+  max-width: 980px;
+}
+
+.tab-tools {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  padding-bottom: 6px;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.tile {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.tile-value {
+  font-size: 18px;
+  white-space: nowrap;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sub-title {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c3ccd8;
+}
+
+.leak-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.leak-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.leak-list em {
+  font-style: normal;
+  color: #ffc576;
+}
+
+.target-table td {
+  padding: 6px 4px;
+}
+
+.target-range {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.chart {
+  position: relative;
+  width: 100%;
+}
+
+.chart svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart-grid {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+}
+
+.chart-cross {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-label {
+  fill: #c3ccd8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  color: #c3ccd8;
+}
+
+.chart-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.chart-tip {
+  position: absolute;
+  z-index: 5;
+  min-width: 140px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(10, 14, 20, 0.95);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tip-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.chart-tip-row span {
+  color: var(--muted);
+}
+
+.mistake {
+  display: grid;
+  gap: 10px;
+}
+
+.mistake-result {
+  display: grid;
+  gap: 6px;
+}
+
+.god-view {
+  margin: 4px 0 8px;
+  font-size: 13px;
+}

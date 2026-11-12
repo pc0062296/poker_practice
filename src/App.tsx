@@ -5,12 +5,13 @@ import { SettingsDialog } from './ui/components/SettingsDialog';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { DrillScreen } from './ui/screens/DrillScreen';
 import { RangesScreen } from './ui/screens/RangesScreen';
+import { RecordsScreen } from './ui/screens/RecordsScreen';
 import { ReviewScreen } from './ui/screens/ReviewScreen';
 import { TableScreen } from './ui/screens/TableScreen';
 import { ToolsScreen } from './ui/screens/ToolsScreen';
 
 /** Screens that exist so far; the others appear as they are built. */
-const READY: View[] = ['table', 'drill', 'ranges', 'tools', 'review'];
+const READY: View[] = ['table', 'drill', 'ranges', 'tools', 'review', 'records'];
 
 function TopBar({ onSettings }: { onSettings: () => void }) {
   const view = useNav((s) => s.view);
@@ -52,6 +53,7 @@ export function App() {
         {view === 'ranges' && <RangesScreen />}
         {view === 'tools' && <ToolsScreen />}
         {view === 'review' && <ReviewScreen />}
+        {view === 'records' && <RecordsScreen />}
       </ErrorBoundary>
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
     </div>

@@ -44,6 +44,8 @@ export function ReviewAnalysisView({ review, onEdit, onBack }: Props) {
   const [postflop, setPostflop] = useState<PostflopGrade[] | null>(null);
   const [partial, setPartial] = useState<PostflopGrade[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
+  const [godView, setGodView] = useState(false);
+  const canReveal = !!review.allHoles;
 
   const positions = reviewPositions(review);
   const names = positions.map((p, i) => (i === 0 ? messages.heroName : p));
@@ -136,10 +138,17 @@ export function ReviewAnalysisView({ review, onEdit, onBack }: Props) {
             showTurn={!hand.isComplete}
             seats={positions.map((_, i) => ({ name: names[i]!, profile: review.profiles[i] ?? 'population' }))}
             settings={settings}
-            known={(i) => i === 0 || !!review.shown[i]}
+            known={(i) => i === 0 || !!review.shown[i] || (godView && canReveal)}
+            faceUp={godView && canReveal ? () => true : undefined}
             showTypes
           />
         </div>
+        {canReveal && (
+          <label className="check god-view">
+            <input type="checkbox" checked={godView} onChange={(e) => setGodView(e.target.checked)} />
+            {t.godView}
+          </label>
+        )}
         <div className="stepper">
           <button className="btn btn-plain btn-small" onClick={() => setStep(0)} disabled={step === 0}>
             {t.start}

@@ -34,6 +34,8 @@ describe('practice spots', () => {
           expect(hand.street).toBe('preflop');
           expect(hand.toAct).toBe(0);
         }
+        // Scripted actions are never graded as the hero's decisions.
+        expect(runner.decisions.length).toBe(0);
         runner.runBots();
       }
     }

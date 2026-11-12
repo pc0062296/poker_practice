@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { cloneHand, potTotal, toHandRecord } from '../engine/hand';
+import { cloneHand, createHand, potTotal, toHandRecord, type HandRecord } from '../engine/hand';
+import { modelsFor } from '../grading/postflop';
 import { assignPositions } from '../engine/positions';
 import { comboIndex } from '../eval/combos';
 import { runSpot, spotById, spotFits } from '../game/spots';
@@ -10,6 +11,7 @@ import type { Action, HandState, LegalActions } from '../engine/types';
 import { HandRunner } from '../game/handRunner';
 import { assignProfiles, drawBotBuyIn, maybeChangeSeat, observerPolicy, seatPolicies } from '../game/lineup';
 import { countHand, emptyCounts, type StatCounts } from '../game/stats';
+import { allInAdjustedNet } from '../stats/allInEv';
 import { gradeInBackground } from '../grading/client';
 import { allChartOverrides } from '../ranges/charts';
 import type { GradingJob, PostflopGrade } from '../grading/postflop';
@@ -117,6 +119,8 @@ export interface GameState {
   /** Live mode: a pending or answered pot-size question at the hero's decision. */
   potQuiz: PotQuiz | null;
   answerPotQuiz(guess: number): void;
+  /** Play an earlier deal again: same seats, stacks and cards. */
+  replayRecord(record: HandRecord, profiles: string[]): void;
 }
 
 export interface PotQuiz {
@@ -153,6 +157,13 @@ let session: Session | null = null;
 let runner: HandRunner | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let toastId = 0;
+/** Identifies the current sitting in stored hands. */
+let sessionId = Date.now();
+/** Set while a hand from history is being played again. */
+let replaying = false;
+let replayProfiles: string[] = [];
+/** Practice spot of the hand in progress, if any. */
+let currentSpot: string | null = null;
 /** Set when the hero's hand was folded automatically. */
 let autoSkipped = false;
 /** Decision for which the pot question was already considered. */
@@ -214,13 +225,16 @@ export const useGame = create<GameState>((set, get) => {
         sizing: { openSize: settings.openSizeBB },
       });
     runner = makeRunner();
+    currentSpot = useSpot ? useSpot.id : null;
     if (useSpot && !runSpot(runner, useSpot, HERO, rng)) {
+      currentSpot = null;
       // A stack too short for the script: deal an ordinary hand instead.
       session.handsDealt--;
       placeButton(session, buttonFor(n, useSpot.hero));
       runner = makeRunner();
     }
     autoSkipped = false;
+    replaying = false;
     quizKey = '';
     set({ phase: 'playing', revealCount: 0, seats: seatInfo(session), potQuiz: null });
     publish();
@@ -230,7 +244,8 @@ export const useGame = create<GameState>((set, get) => {
   const finishHand = (): void => {
     if (!runner || !session) return;
     const hand = runner.hand;
-    endHand(session, hand);
+    // A replayed deal does not change the stacks of the running table.
+    if (!replaying) endHand(session, hand);
     const hole = hand.players[HERO]!.hole;
     const grades: PreflopGrade[] = [];
     if (!autoSkipped) {
@@ -241,7 +256,7 @@ export const useGame = create<GameState>((set, get) => {
     }
     const heroNet = hand.result!.net[HERO]!;
     const time = Date.now();
-    const profiles = session.seats.map((s) => s.profile);
+    const profiles = replaying ? replayProfiles : session.seats.map((s) => s.profile);
     const needsPostflop = runner.decisions.some((d) => d.street !== 'preflop');
     const entry: HistoryEntry = {
       key: ++entryKey,
@@ -258,20 +273,32 @@ export const useGame = create<GameState>((set, get) => {
     const state = get();
     const seatCounts = state.seatCounts.map((c) => ({ ...c }));
     while (seatCounts.length < hand.players.length) seatCounts.push(emptyCounts());
-    countHand(hand, seatCounts);
+    if (!replaying) countHand(hand, seatCounts);
     const counted = grades.filter((g) => g.verdict !== 'ungraded');
     const stats: SessionStats = {
       ...state.stats,
       hands: state.stats.hands + 1,
       skipped: state.stats.skipped + (autoSkipped ? 1 : 0),
-      net: seatNet(session.seats[HERO]!),
+      net: replaying ? state.stats.net : seatNet(session.seats[HERO]!),
       graded: state.stats.graded + counted.length,
       good: state.stats.good + counted.filter((g) => g.verdict === 'best' || g.verdict === 'ok').length,
     };
     const history = [entry, ...state.history].slice(0, HISTORY_LIMIT);
     const record = toHandRecord(hand, time);
 
-    const saved = saveHand({ time, heroIndex: HERO, heroNet, record, preflopGrades: grades, profiles }).then((id) => {
+    const heroEvNet = allInAdjustedNet(hand, HERO);
+    const saved = saveHand({
+      time,
+      heroIndex: HERO,
+      heroNet,
+      heroEvNet,
+      record,
+      preflopGrades: grades,
+      profiles,
+      sessionId,
+      replay: replaying || undefined,
+      spot: currentSpot ?? undefined,
+    }).then((id) => {
       if (id !== null) {
         set((s) => ({ storedHands: (s.storedHands ?? 0) + 1 }));
         updateEntry(entry.key, { storedId: id });
@@ -396,6 +423,7 @@ export const useGame = create<GameState>((set, get) => {
     const profiles = assignProfiles(lineup, bots, rng);
     const buyIns = profiles.map(() => drawBotBuyIn(config, lineup, rng));
     session = createSession(config, names, rng, profiles, buyIns);
+    sessionId = Date.now();
     session.seats[HERO]!.name = messages.heroName;
     runner = null;
     set({
@@ -438,6 +466,45 @@ export const useGame = create<GameState>((set, get) => {
     notice: null,
 
     start: () => openTable(),
+
+    replayRecord: (record, profiles) => {
+      clearTimer();
+      const { settings } = get();
+      if (!session) {
+        openTable();
+        clearTimer();
+      }
+      const lineup = toLineup(settings);
+      const hand = createHand({
+        handId: ++session!.handsDealt,
+        config: record.config,
+        seats: record.seats.map((s, i) => ({ ...s, name: i === HERO ? messages.heroName : s.name })),
+        buttonIndex: record.buttonIndex,
+        rng,
+        holeCards: record.holeCards,
+        board: record.runout,
+      });
+      const models = modelsFor(profiles, lineup.custom, HERO);
+      runner = new HandRunner(hand, {
+        heroIndex: HERO,
+        rng,
+        policies: models.policies,
+        observer: models.observer,
+        sizing: { openSize: settings.openSizeBB },
+      });
+      replaying = true;
+      replayProfiles = profiles.slice();
+      autoSkipped = false;
+      quizKey = '';
+      set({
+        phase: 'playing',
+        revealCount: 0,
+        potQuiz: null,
+        seats: hand.players.map((p, i) => ({ name: p.name, profile: profiles[i] ?? 'population' })),
+      });
+      publish();
+      pump();
+    },
 
     heroAct: (action) => {
       if (!runner || !runner.heroToAct) return;
