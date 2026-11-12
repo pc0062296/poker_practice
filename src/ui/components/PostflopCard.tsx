@@ -80,7 +80,7 @@ export function PostflopCard({ grade, settings }: { grade: PostflopGrade; settin
       </p>
       <p className="grade-note">
         {grade.exact ? t.exact : fmt(t.estimate, { se: formatAmount(maxSe, settings, true) })}
-        {grade.checkdown && ` · ${t.checkdown}`}
+        {grade.checkdown && `${messages.symbols.separator}${t.checkdown}`}
       </p>
 
       <div className="freq-bar" aria-hidden="true">
