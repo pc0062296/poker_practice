@@ -27,6 +27,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+        env:
+          # The desktop wrapper is not needed here.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm test
       - run: npm run build
       - uses: actions/upload-pages-artifact@v3

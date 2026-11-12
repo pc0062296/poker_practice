@@ -1,0 +1,28 @@
+name: Windows app
+
+# Builds the desktop app on Windows: a portable exe and an installer, with the app icon.
+# Download them from the run's "Artifacts" section.
+
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PokerPractice-windows
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 30

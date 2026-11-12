@@ -23,6 +23,21 @@ npm run typecheck
 npm run build       # production build in dist/
 ```
 
+## Windows app
+
+The same app also runs as a Windows program (Electron), with its data kept in the app's
+own profile folder.
+
+```bash
+npm run app        # build and open the desktop window
+npm run dist:win   # build release/PokerPractice-<version>-portable.exe and an installer
+```
+
+Building the installer needs Windows (or Wine). Every push also builds both files on a
+Windows runner (`.github/workflows/windows-app.yml`); download them from the run's
+Artifacts. The files are not code-signed, so Windows SmartScreen asks for confirmation
+the first time ("More info", then "Run anyway").
+
 ## Deploy
 
 Pushing to `main` builds the app and publishes it to GitHub Pages
